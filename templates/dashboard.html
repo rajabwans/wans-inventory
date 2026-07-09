@@ -2,56 +2,117 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="fw-bold"><i class="bi bi-speedometer2"></i> Dashboard</h3>
-    <span class="text-muted" id="currentDate"></span>
+    <div>
+        <h3 class="fw-bold mb-0"><i class="bi bi-speedometer2"></i> Executive Dashboard</h3>
+        <p class="text-muted small mb-0">{{ COMPANY_NAME }} — Inventory Performance Overview</p>
+    </div>
+    <span class="text-muted small" id="currentDate"></span>
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-primary bg-opacity-10 h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted small">Products</h5>
-                <p class="display-6 fw-bold mb-0">{{ total_products }}</p>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="small opacity-75 mb-1">Total Products</p>
+                        <h2 class="fw-bold mb-0">{{ total_products }}</h2>
+                    </div>
+                    <i class="bi bi-box-seam fs-1 opacity-50"></i>
+                </div>
+                <p class="small opacity-75 mb-0 mt-2">Items in {{ CURRENCY }} {{ "{:,.0f}".format(total_invested) }} invested</p>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-info bg-opacity-10 h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted small">Total Stock</h5>
-                <p class="display-6 fw-bold mb-0">{{ total_stock }}</p>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="small opacity-75 mb-1">Stock Units</p>
+                        <h2 class="fw-bold mb-0">{{ total_stock }}</h2>
+                    </div>
+                    <i class="bi bi-archive fs-1 opacity-50"></i>
+                </div>
+                <p class="small opacity-75 mb-0 mt-2">Units across all products</p>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-danger bg-opacity-10 h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted small">Capital Invested</h5>
-                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_invested) }}</p>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="small opacity-75 mb-1">Total Revenue</p>
+                        <h2 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_sales_amount) }}</h2>
+                    </div>
+                    <i class="bi bi-graph-up-arrow fs-1 opacity-50"></i>
+                </div>
+                <p class="small opacity-75 mb-0 mt-2">From {{ recent_sales_count or 0 }} transactions</p>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-success bg-opacity-10 h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted small">Total Sales</h5>
-                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_sales_amount) }}</p>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="small opacity-75 mb-1">Net Profit</p>
+                        <h2 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_profit) }}</h2>
+                    </div>
+                    <i class="bi bi-cash-stack fs-1 opacity-50"></i>
+                </div>
+                <p class="small opacity-75 mb-0 mt-2">
+                    {% if total_sales_amount > 0 %}
+                    Margin: {{ "{:,.1f}".format(total_profit / total_sales_amount * 100) }}%
+                    {% else %}No sales yet{% endif %}
+                </p>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-warning bg-opacity-10 h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted small">Profit Made</h5>
-                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_profit) }}</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm bg-dark text-white h-100">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Capital Invested</p>
+                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_invested) }}</h4>
+                <p class="small opacity-75 mb-0 mt-2">Total buying cost of stock</p>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card border-0 shadow-sm bg-success bg-opacity-25 h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted small">Expected Profit</h5>
-                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_possible_profit) }}</p>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="small text-muted mb-1">Expected Profit</p>
+                <h4 class="fw-bold mb-0 text-success">{{ CURRENCY }} {{ "{:,.0f}".format(total_possible_profit) }}</h4>
+                <p class="small text-muted mb-0 mt-2">If all stock sells at listed price</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="small text-muted mb-1">Capital Recovery</p>
+                {% if total_invested > 0 %}
+                {% set recovered = (total_sales_amount - total_profit) / total_invested * 100 %}
+                {% else %}{% set recovered = 0 %}{% endif %}
+                <h4 class="fw-bold mb-0">{{ "{:,.1f}".format(recovered) }}%</h4>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar bg-success" style="width: {% if recovered > 100 %}100{% else %}{{ "{:,.1f}".format(recovered) }}{% endif %}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="small text-muted mb-1">Low Stock Items</p>
+                <h4 class="fw-bold mb-0 {% if low_stock|length > 0 %}text-danger{% else %}text-success{% endif %}">
+                    {{ low_stock|length }}
+                </h4>
+                <p class="small text-muted mb-0 mt-2">Items with 5 or fewer units</p>
             </div>
         </div>
     </div>
@@ -62,56 +123,108 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <strong><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock Alert</strong>
+                <a href="{{ url_for('products') }}" class="btn btn-sm btn-outline-dark"><i class="bi bi-eye"></i> View All</a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
-                        <thead class="table-light"><tr><th>Product</th><th>Qty</th><th>Action</th></tr></thead>
+                        <thead class="table-light"><tr><th>Product</th><th>Qty</th><th>Value at Cost</th><th>Action</th></tr></thead>
                         <tbody>
                             {% for item in low_stock %}
                             <tr>
                                 <td>{{ item.title }}</td>
                                 <td><span class="badge bg-danger">{{ item.quantity }}</span></td>
+                                <td>{{ CURRENCY }} {{ "{:,.0f}".format(item.quantity * item.buying_price) }}</td>
                                 <td><a href="{{ url_for('edit_product', id=item.id) }}" class="btn btn-sm btn-outline-primary">Restock</a></td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="3" class="text-center text-muted py-3">All products well stocked</td></tr>
+                            <tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-check-circle text-success fs-5"></i> All products are well stocked</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <strong><i class="bi bi-clock-history"></i> Recent Sales</strong>
+        {% if category_breakdown %}
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <strong><i class="bi bi-pie-chart"></i> Category Breakdown</strong>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
-                        <thead class="table-light"><tr><th>Product</th><th>Qty</th><th>Amount</th><th>Profit</th></tr></thead>
+                        <thead class="table-light"><tr><th>Category</th><th>Products</th><th>Stock</th><th>Value</th></tr></thead>
+                        <tbody>
+                            {% for cat in category_breakdown %}
+                            <tr>
+                                <td><strong>{{ cat.category or 'Uncategorized' }}</strong></td>
+                                <td>{{ cat.count }}</td>
+                                <td>{{ cat.stock }}</td>
+                                <td>{{ CURRENCY }} {{ "{:,.0f}".format(cat.value) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong><i class="bi bi-clock-history"></i> Recent Transactions</strong>
+                <a href="{{ url_for('sales') }}" class="btn btn-sm btn-outline-dark"><i class="bi bi-eye"></i> View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light"><tr><th>Product</th><th>Qty</th><th>Amount</th><th>Profit</th><th>Date</th></tr></thead>
                         <tbody>
                             {% for sale in recent_sales %}
                             <tr>
                                 <td>{{ sale.title }}</td>
                                 <td>{{ sale.quantity_sold }}</td>
-                                <td>GHS {{ "{:,.2f}".format(sale.total_amount) }}</td>
-                                <td class="text-success">GHS {{ "{:,.2f}".format(sale.profit) }}</td>
+                                <td>{{ CURRENCY }} {{ "{:,.0f}".format(sale.total_amount) }}</td>
+                                <td class="text-success fw-bold">+{{ CURRENCY }} {{ "{:,.0f}".format(sale.profit) }}</td>
+                                <td class="small text-muted">{{ sale.sale_date[:10] }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="4" class="text-center text-muted py-3">No sales yet</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-inbox fs-5"></i> No sales recorded yet</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+        {% if top_products %}
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <strong><i class="bi bi-trophy"></i> Top Selling Products</strong>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light"><tr><th>#</th><th>Product</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+                        <tbody>
+                            {% for t in top_products %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td><strong>{{ t.title }}</strong></td>
+                                <td>{{ t.total_sold }}</td>
+                                <td>{{ CURRENCY }} {{ "{:,.0f}".format(t.revenue) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 <script>
-    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
+    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-UG', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
 </script>

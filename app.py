@@ -8,9 +8,15 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 PASSWORD = os.environ.get('APP_PASSWORD', 'wans123')
+COMPANY_NAME = os.environ.get('COMPANY_NAME', 'WANS COLLECTION')
+CURRENCY = os.environ.get('CURRENCY', 'UGX')
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inventory.db'))
 
 IS_PG = bool(DATABASE_URL)
+
+@app.context_processor
+def inject_globals():
+    return dict(COMPANY_NAME=COMPANY_NAME, CURRENCY=CURRENCY)
 
 if IS_PG:
     import psycopg2
@@ -132,11 +138,24 @@ def dashboard():
         JOIN products p ON s.product_id = p.id
         ORDER BY s.sale_date DESC LIMIT 10
     ''').fetchall()
+    recent_sales_count = query(conn, 'SELECT COUNT(*) as c FROM sales').fetchone()['c']
+    category_breakdown = query(conn, '''
+        SELECT COALESCE(category,'Uncategorized') as category,
+               COUNT(*) as count, COALESCE(SUM(quantity),0) as stock,
+               COALESCE(SUM(buying_price * quantity),0) as value
+        FROM products GROUP BY category ORDER BY value DESC
+    ''').fetchall()
+    top_products = query(conn, '''
+        SELECT p.title, SUM(s.quantity_sold) as total_sold, COALESCE(SUM(s.total_amount),0) as revenue
+        FROM sales s JOIN products p ON s.product_id = p.id
+        GROUP BY p.id ORDER BY revenue DESC LIMIT 5
+    ''').fetchall()
     db_close(conn)
     return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
                            total_invested=total_invested, total_sales_amount=total_sales_amount,
                            total_profit=total_profit, total_possible_profit=total_possible_profit,
-                           low_stock=low_stock, recent_sales=recent_sales)
+                           low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
+                           category_breakdown=category_breakdown, top_products=top_products)
 
 @app.route('/products')
 @login_required

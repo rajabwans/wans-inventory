@@ -27,14 +27,11 @@
                         <div class="col-md-6">
                             <label class="form-label">Category</label>
                             <select name="category" class="form-select">
-                                <option value="">Select...</option>
-                                <option {% if product.category == 'Fiction' %}selected{% endif %}>Fiction</option>
-                                <option {% if product.category == 'Non-Fiction' %}selected{% endif %}>Non-Fiction</option>
-                                <option {% if product.category == 'Educational' %}selected{% endif %}>Educational</option>
-                                <option {% if product.category == 'Children' %}selected{% endif %}>Children</option>
-                                <option {% if product.category == 'Religious' %}selected{% endif %}>Religious</option>
-                                <option {% if product.category == 'Magazine' %}selected{% endif %}>Magazine</option>
-                                <option {% if product.category == 'Other' %}selected{% endif %}>Other</option>
+                                <option value="">Select category...</option>
+                                <option {% if product.category == 'Perfumes' %}selected{% endif %}>Perfumes</option>
+                                <option {% if product.category == 'Scented Oils' %}selected{% endif %}>Scented Oils</option>
+                                <option {% if product.category == 'Toys' %}selected{% endif %}>Toys</option>
+                                <option {% if product.category == 'Womens Bags' %}selected{% endif %}>Womens Bags</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -42,12 +39,12 @@
                             <input type="number" name="quantity" class="form-control" value="{{ product.quantity }}" min="0" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Buying Price (GHS) *</label>
-                            <input type="number" step="0.01" name="buying_price" class="form-control" value="{{ product.buying_price }}" min="0" required>
+                            <label class="form-label">Buying Price ({{ CURRENCY }}) *</label>
+                            <input type="number" step="1" name="buying_price" class="form-control" value="{{ product.buying_price }}" min="0" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Selling Price (GHS) *</label>
-                            <input type="number" step="0.01" name="selling_price" class="form-control" value="{{ product.selling_price }}" min="0" required>
+                            <label class="form-label">Selling Price ({{ CURRENCY }}) *</label>
+                            <input type="number" step="1" name="selling_price" class="form-control" value="{{ product.selling_price }}" min="0" required>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Notes</label>

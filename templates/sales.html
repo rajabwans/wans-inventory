@@ -29,9 +29,9 @@
                         <td><strong>{{ s.title }}</strong></td>
                         <td>{{ s.customer_name or '-' }}</td>
                         <td>{{ s.quantity_sold }}</td>
-                        <td>GHS {{ "{:,.2f}".format(s.unit_price) }}</td>
-                        <td>GHS {{ "{:,.2f}".format(s.total_amount) }}</td>
-                        <td class="text-success fw-bold">+ GHS {{ "{:,.2f}".format(s.profit) }}</td>
+                        <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.unit_price) }}</td>
+                        <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.total_amount) }}</td>
+                        <td class="text-success fw-bold">+ {{ CURRENCY }} {{ "{:,.0f}".format(s.profit) }}</td>
                         <td class="small">{{ s.sale_date[:10] }}</td>
                         <td>
                             <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" onsubmit="return confirm('Delete this sale? Stock will be restored.')">

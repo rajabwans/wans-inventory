@@ -27,14 +27,11 @@
                         <div class="col-md-6">
                             <label class="form-label">Category</label>
                             <select name="category" class="form-select">
-                                <option value="">Select...</option>
-                                <option>Fiction</option>
-                                <option>Non-Fiction</option>
-                                <option>Educational</option>
-                                <option>Children</option>
-                                <option>Religious</option>
-                                <option>Magazine</option>
-                                <option>Other</option>
+                                <option value="">Select category...</option>
+                                <option>Perfumes</option>
+                                <option>Scented Oils</option>
+                                <option>Toys</option>
+                                <option>Womens Bags</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -42,12 +39,12 @@
                             <input type="number" name="quantity" class="form-control" value="0" min="0" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Buying Price (GHS) *</label>
-                            <input type="number" step="0.01" name="buying_price" class="form-control" value="0" min="0" required>
+                            <label class="form-label">Buying Price ({{ CURRENCY }}) *</label>
+                            <input type="number" step="1" name="buying_price" class="form-control" value="0" min="0" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Selling Price (GHS) *</label>
-                            <input type="number" step="0.01" name="selling_price" class="form-control" value="0" min="0" required>
+                            <label class="form-label">Selling Price ({{ CURRENCY }}) *</label>
+                            <input type="number" step="1" name="selling_price" class="form-control" value="0" min="0" required>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Notes</label>
