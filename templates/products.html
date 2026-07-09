@@ -23,6 +23,7 @@
                         <th>Buy Price</th>
                         <th>Sell Price</th>
                         <th>Margin</th>
+                        <th>Date</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -42,6 +43,7 @@
                         <td class="{% if p.profit_margin > 0 %}text-success{% else %}text-danger{% endif %}">
                             {{ CURRENCY }} {{ "{:,.0f}".format(p.profit_margin) }}
                         </td>
+                        <td class="small text-muted">{{ p.created_at[:10] if p.created_at is string else p.created_at.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <a href="{{ url_for('edit_product', id=p.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
                             <form method="POST" action="{{ url_for('delete_product', id=p.id) }}" class="d-inline" onsubmit="return confirm('Delete this product?')">
@@ -50,7 +52,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr id="noProductsRow"><td colspan="8" class="text-center text-muted py-4">No products yet. <a href="{{ url_for('add_product') }}">Add your first product</a></td></tr>
+                    <tr id="noProductsRow"><td colspan="9" class="text-center text-muted py-4">No products yet. <a href="{{ url_for('add_product') }}">Add your first product</a></td></tr>
                     {% endfor %}
                 </tbody>
             </table>
