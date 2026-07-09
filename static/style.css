@@ -1,0 +1,36 @@
+body {
+    background-color: #f5f6fa;
+    font-size: 0.95rem;
+}
+.navbar-brand {
+    letter-spacing: 0.5px;
+}
+.card {
+    border-radius: 10px;
+    border: none;
+}
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    border-bottom: 1px solid #eee;
+}
+.table > :not(caption) > * > * {
+    vertical-align: middle;
+}
+.badge {
+    font-size: 0.8rem;
+}
+.btn {
+    border-radius: 8px;
+}
+.alert {
+    border-radius: 10px;
+}
+@media (max-width: 768px) {
+    .display-6 {
+        font-size: 1.5rem;
+    }
+    .container-fluid {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}

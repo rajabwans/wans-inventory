@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Sales{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-cart"></i> Sales History</h4>
+    <a href="{{ url_for('add_sale') }}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> New Sale</a>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th>Customer</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                        <th>Profit</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sales %}
+                    <tr>
+                        <td>{{ s.id }}</td>
+                        <td><strong>{{ s.title }}</strong></td>
+                        <td>{{ s.customer_name or '-' }}</td>
+                        <td>{{ s.quantity_sold }}</td>
+                        <td>GHS {{ "{:,.2f}".format(s.unit_price) }}</td>
+                        <td>GHS {{ "{:,.2f}".format(s.total_amount) }}</td>
+                        <td class="text-success fw-bold">+ GHS {{ "{:,.2f}".format(s.profit) }}</td>
+                        <td class="small">{{ s.sale_date[:10] }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="text-center text-muted py-4">No sales recorded yet. <a href="{{ url_for('add_sale') }}">Record a sale</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

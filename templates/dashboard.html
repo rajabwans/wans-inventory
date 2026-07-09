@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold"><i class="bi bi-speedometer2"></i> Dashboard</h3>
+    <span class="text-muted" id="currentDate"></span>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm bg-primary bg-opacity-10 h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted small">Products</h5>
+                <p class="display-6 fw-bold mb-0">{{ total_products }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm bg-info bg-opacity-10 h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted small">Total Stock</h5>
+                <p class="display-6 fw-bold mb-0">{{ total_stock }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm bg-danger bg-opacity-10 h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted small">Capital Invested</h5>
+                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_invested) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm bg-success bg-opacity-10 h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted small">Total Sales</h5>
+                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_sales_amount) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm bg-warning bg-opacity-10 h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted small">Profit Made</h5>
+                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_profit) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm bg-success bg-opacity-25 h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted small">Expected Profit</h5>
+                <p class="display-6 fw-bold mb-0">GHS {{ "{:,.2f}".format(total_possible_profit) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock Alert</strong>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light"><tr><th>Product</th><th>Qty</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for item in low_stock %}
+                            <tr>
+                                <td>{{ item.title }}</td>
+                                <td><span class="badge bg-danger">{{ item.quantity }}</span></td>
+                                <td><a href="{{ url_for('edit_product', id=item.id) }}" class="btn btn-sm btn-outline-primary">Restock</a></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-center text-muted py-3">All products well stocked</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong><i class="bi bi-clock-history"></i> Recent Sales</strong>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light"><tr><th>Product</th><th>Qty</th><th>Amount</th><th>Profit</th></tr></thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td>{{ sale.title }}</td>
+                                <td>{{ sale.quantity_sold }}</td>
+                                <td>GHS {{ "{:,.2f}".format(sale.total_amount) }}</td>
+                                <td class="text-success">GHS {{ "{:,.2f}".format(sale.profit) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No sales yet</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+</script>
+{% endblock %}
