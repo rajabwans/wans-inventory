@@ -144,7 +144,13 @@ def dashboard():
     total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales').fetchone()['t']
     total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales').fetchone()['t']
     total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products').fetchone()['t']
-    total_expenses = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses').fetchone()['t']
+    from datetime import date
+    first = date.today().replace(day=1)
+    next_month = first.replace(month=first.month % 12 + 1, year=first.year + (first.month // 12))
+    monthly_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales WHERE sale_date >= ? AND sale_date < ?',
+                           (first.isoformat(), next_month.isoformat())).fetchone()['t']
+    monthly_expenses = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date >= ? AND expense_date < ?',
+                              (first.isoformat(), next_month.isoformat())).fetchone()['t']
     low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 ORDER BY quantity LIMIT 10').fetchall()
     recent_sales = query(conn, '''
         SELECT s.*, p.title FROM sales s
@@ -167,7 +173,7 @@ def dashboard():
     return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
                            total_invested=total_invested, total_sales_amount=total_sales_amount,
                            total_profit=total_profit, total_possible_profit=total_possible_profit,
-                           total_expenses=total_expenses,
+                           monthly_profit=monthly_profit, monthly_expenses=monthly_expenses,
                            low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
                            category_breakdown=category_breakdown, top_products=top_products)
 
