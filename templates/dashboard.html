@@ -64,7 +64,8 @@
                 </div>
                 <p class="small opacity-75 mb-0 mt-2">
                     {% if total_sales_amount > 0 %}
-                    Margin: {{ "{:,.1f}".format(total_profit / total_sales_amount * 100) }}%
+                    Margin: {{ "{:,.1f}".format(total_profit / total_sales_amount * 100) }}% |
+                    Net: {{ CURRENCY }} {{ "{:,.0f}".format(total_profit - total_expenses) }}
                     {% else %}No sales yet{% endif %}
                 </p>
             </div>
@@ -79,6 +80,15 @@
                 <p class="small opacity-75 mb-1">Capital Invested</p>
                 <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_invested) }}</h4>
                 <p class="small opacity-75 mb-0 mt-2">Total buying cost of stock</p>
+            </div>
+        </div>
+    </a>
+    <a href="{{ url_for('expenses') }}" class="col-6 col-lg-3 text-decoration-none">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="small text-muted mb-1">Total Expenses</p>
+                <h4 class="fw-bold mb-0 text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(total_expenses) }}</h4>
+                <p class="small text-muted mb-0 mt-2">Minor business expenses</p>
             </div>
         </div>
     </a>

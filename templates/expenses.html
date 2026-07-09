@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Expenses{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-receipt"></i> Expenses</h4>
+    <a href="{{ url_for('add_expense') }}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> Add Expense</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-danger text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Total Expenses</p>
+                <h3 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total) }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in expenses %}
+                    <tr>
+                        <td>{{ e.id }}</td>
+                        <td><strong>{{ e.description }}</strong></td>
+                        <td><span class="badge bg-secondary">{{ e.category or '-' }}</span></td>
+                        <td class="text-danger fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(e.amount) }}</td>
+                        <td class="small text-muted">{{ e.expense_date[:10] if e.expense_date is string else e.expense_date.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_expense', id=e.id) }}" class="d-inline" onsubmit="return confirm('Delete this expense?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center text-muted py-4">No expenses recorded yet. <a href="{{ url_for('add_expense') }}">Add your first expense</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

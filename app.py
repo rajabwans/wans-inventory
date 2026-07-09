@@ -65,6 +65,12 @@ SCHEMA_SQLITE = '''
         sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (product_id) REFERENCES products(id)
     );
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT NOT NULL, amount REAL NOT NULL, category TEXT,
+        expense_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 '''
 
 SCHEMA_PG = '''
@@ -80,6 +86,12 @@ SCHEMA_PG = '''
         quantity_sold INTEGER NOT NULL, unit_price REAL NOT NULL,
         total_amount REAL NOT NULL, profit REAL NOT NULL, customer_name TEXT,
         sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        description TEXT NOT NULL, amount REAL NOT NULL, category TEXT,
+        expense_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 '''
 
@@ -132,6 +144,7 @@ def dashboard():
     total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales').fetchone()['t']
     total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales').fetchone()['t']
     total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products').fetchone()['t']
+    total_expenses = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses').fetchone()['t']
     low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 ORDER BY quantity LIMIT 10').fetchall()
     recent_sales = query(conn, '''
         SELECT s.*, p.title FROM sales s
@@ -154,6 +167,7 @@ def dashboard():
     return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
                            total_invested=total_invested, total_sales_amount=total_sales_amount,
                            total_profit=total_profit, total_possible_profit=total_possible_profit,
+                           total_expenses=total_expenses,
                            low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
                            category_breakdown=category_breakdown, top_products=top_products)
 
@@ -285,6 +299,41 @@ def delete_sale(id):
     db_close(conn)
     flash('Sale deleted', 'success')
     return redirect(url_for('sales'))
+
+@app.route('/expenses')
+@login_required
+def expenses():
+    conn = get_db()
+    all_expenses = query(conn, 'SELECT * FROM expenses ORDER BY expense_date DESC').fetchall()
+    total = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses').fetchone()['t']
+    db_close(conn)
+    return render_template('expenses.html', expenses=all_expenses, total=total)
+
+@app.route('/expenses/add', methods=['GET', 'POST'])
+@login_required
+def add_expense():
+    if request.method == 'POST':
+        description = request.form['description']
+        amount = float(request.form['amount'])
+        category = request.form.get('category', '')
+        conn = get_db()
+        query(conn, 'INSERT INTO expenses (description, amount, category) VALUES (?,?,?)',
+              (description, amount, category))
+        db_commit(conn)
+        db_close(conn)
+        flash('Expense added successfully', 'success')
+        return redirect(url_for('expenses'))
+    return render_template('add_expense.html')
+
+@app.route('/expenses/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_expense(id):
+    conn = get_db()
+    query(conn, 'DELETE FROM expenses WHERE id = ?', (id,))
+    db_commit(conn)
+    db_close(conn)
+    flash('Expense deleted', 'success')
+    return redirect(url_for('expenses'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
