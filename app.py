@@ -125,43 +125,37 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    try:
-        conn = get_db()
-        total_products = query(conn, 'SELECT COUNT(*) as c FROM products').fetchone()['c']
-        total_stock = query(conn, 'SELECT COALESCE(SUM(quantity),0) as s FROM products').fetchone()['s']
-        total_invested = query(conn, 'SELECT COALESCE(SUM(buying_price * quantity),0) as t FROM products').fetchone()['t']
-        total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales').fetchone()['t']
-        total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales').fetchone()['t']
-        total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products').fetchone()['t']
-        low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 ORDER BY quantity LIMIT 10').fetchall()
-        recent_sales = query(conn, '''
-            SELECT s.*, p.title FROM sales s
-            JOIN products p ON s.product_id = p.id
-            ORDER BY s.sale_date DESC LIMIT 10
-        ''').fetchall()
-        recent_sales_count = query(conn, 'SELECT COUNT(*) as c FROM sales').fetchone()['c']
-        category_breakdown = query(conn, '''
-            SELECT COALESCE(category,'Uncategorized') as category,
-                   COUNT(*) as count, COALESCE(SUM(quantity),0) as stock,
-                   COALESCE(SUM(buying_price * quantity),0) as value
-            FROM products GROUP BY category ORDER BY value DESC
-        ''').fetchall()
-        top_products = query(conn, '''
-            SELECT p.title, SUM(s.quantity_sold) as total_sold, COALESCE(SUM(s.total_amount),0) as revenue
-            FROM sales s JOIN products p ON s.product_id = p.id
-            GROUP BY p.id ORDER BY revenue DESC LIMIT 5
-        ''').fetchall()
-        db_close(conn)
-        return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
-                               total_invested=total_invested, total_sales_amount=total_sales_amount,
-                               total_profit=total_profit, total_possible_profit=total_possible_profit,
-                               low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
-                               category_breakdown=category_breakdown, top_products=top_products)
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        print(f'[DASHBOARD CRASH] {tb}', file=sys.stderr)
-        return f'<h1>500 Error</h1><pre>{tb}</pre>', 500
+    conn = get_db()
+    total_products = query(conn, 'SELECT COUNT(*) as c FROM products').fetchone()['c']
+    total_stock = query(conn, 'SELECT COALESCE(SUM(quantity),0) as s FROM products').fetchone()['s']
+    total_invested = query(conn, 'SELECT COALESCE(SUM(buying_price * quantity),0) as t FROM products').fetchone()['t']
+    total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales').fetchone()['t']
+    total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales').fetchone()['t']
+    total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products').fetchone()['t']
+    low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 ORDER BY quantity LIMIT 10').fetchall()
+    recent_sales = query(conn, '''
+        SELECT s.*, p.title FROM sales s
+        JOIN products p ON s.product_id = p.id
+        ORDER BY s.sale_date DESC LIMIT 10
+    ''').fetchall()
+    recent_sales_count = query(conn, 'SELECT COUNT(*) as c FROM sales').fetchone()['c']
+    category_breakdown = query(conn, '''
+        SELECT COALESCE(category,'Uncategorized') as category,
+               COUNT(*) as count, COALESCE(SUM(quantity),0) as stock,
+               COALESCE(SUM(buying_price * quantity),0) as value
+        FROM products GROUP BY category ORDER BY value DESC
+    ''').fetchall()
+    top_products = query(conn, '''
+        SELECT p.title, SUM(s.quantity_sold) as total_sold, COALESCE(SUM(s.total_amount),0) as revenue
+        FROM sales s JOIN products p ON s.product_id = p.id
+        GROUP BY p.id ORDER BY revenue DESC LIMIT 5
+    ''').fetchall()
+    db_close(conn)
+    return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
+                           total_invested=total_invested, total_sales_amount=total_sales_amount,
+                           total_profit=total_profit, total_possible_profit=total_possible_profit,
+                           low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
+                           category_breakdown=category_breakdown, top_products=top_products)
 
 @app.route('/products')
 @login_required
@@ -238,17 +232,11 @@ def delete_product(id):
 @login_required
 def sales():
     conn = get_db()
-    try:
-        all_sales = query(conn, '''
-            SELECT s.*, p.title FROM sales s
-            JOIN products p ON s.product_id = p.id
-            ORDER BY s.sale_date DESC
-        ''').fetchall()
-    except Exception as e:
-        db_close(conn)
-        print(f'[SALES ERROR] {e}', file=sys.stderr)
-        flash(f'Database error: {e}', 'danger')
-        return redirect(url_for('dashboard'))
+    all_sales = query(conn, '''
+        SELECT s.*, p.title FROM sales s
+        JOIN products p ON s.product_id = p.id
+        ORDER BY s.sale_date DESC
+    ''').fetchall()
     db_close(conn)
     return render_template('sales.html', sales=all_sales)
 
@@ -297,35 +285,6 @@ def delete_sale(id):
     db_close(conn)
     flash('Sale deleted', 'success')
     return redirect(url_for('sales'))
-
-@app.route('/_dbcheck')
-def db_check():
-    conn = get_db()
-    info = {'is_pg': IS_PG}
-    if IS_PG:
-        try:
-            cur = query(conn, 'SELECT table_name FROM information_schema.tables WHERE table_schema=\'public\'')
-            info['tables'] = [r['table_name'] for r in cur.fetchall()]
-        except Exception as e:
-            info['tables_error'] = str(e)
-    else:
-        try:
-            cur = query(conn, "SELECT name FROM sqlite_master WHERE type='table'")
-            info['tables'] = [r['name'] for r in cur.fetchall()]
-        except Exception as e:
-            info['tables_error'] = str(e)
-    try:
-        cur = query(conn, 'SELECT COUNT(*) as c FROM products')
-        info['products_count'] = cur.fetchone()['c']
-    except Exception as e:
-        info['products_error'] = str(e)
-    try:
-        cur = query(conn, 'SELECT COUNT(*) as c FROM sales')
-        info['sales_count'] = cur.fetchone()['c']
-    except Exception as e:
-        info['sales_error'] = str(e)
-    db_close(conn)
-    return info
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

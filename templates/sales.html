@@ -32,7 +32,7 @@
                         <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.unit_price) }}</td>
                         <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.total_amount) }}</td>
                         <td class="text-success fw-bold">+ {{ CURRENCY }} {{ "{:,.0f}".format(s.profit) }}</td>
-                        <td class="small">{{ s.sale_date[:10] }}</td>
+                        <td class="small">{{ s.sale_date[:10] if s.sale_date is string else s.sale_date.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
