@@ -125,8 +125,8 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    conn = get_db()
     try:
+        conn = get_db()
         total_products = query(conn, 'SELECT COUNT(*) as c FROM products').fetchone()['c']
         total_stock = query(conn, 'SELECT COALESCE(SUM(quantity),0) as s FROM products').fetchone()['s']
         total_invested = query(conn, 'SELECT COALESCE(SUM(buying_price * quantity),0) as t FROM products').fetchone()['t']
@@ -151,17 +151,17 @@ def dashboard():
             FROM sales s JOIN products p ON s.product_id = p.id
             GROUP BY p.id ORDER BY revenue DESC LIMIT 5
         ''').fetchall()
-    except Exception as e:
         db_close(conn)
-        print(f'[DASHBOARD ERROR] {e}', file=sys.stderr)
-        flash(f'Database error: {e}', 'danger')
-        return redirect(url_for('products'))
-    db_close(conn)
-    return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
-                           total_invested=total_invested, total_sales_amount=total_sales_amount,
-                           total_profit=total_profit, total_possible_profit=total_possible_profit,
-                           low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
-                           category_breakdown=category_breakdown, top_products=top_products)
+        return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
+                               total_invested=total_invested, total_sales_amount=total_sales_amount,
+                               total_profit=total_profit, total_possible_profit=total_possible_profit,
+                               low_stock=low_stock, recent_sales=recent_sales, recent_sales_count=recent_sales_count,
+                               category_breakdown=category_breakdown, top_products=top_products)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f'[DASHBOARD CRASH] {tb}', file=sys.stderr)
+        return f'<h1>500 Error</h1><pre>{tb}</pre>', 500
 
 @app.route('/products')
 @login_required
