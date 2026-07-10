@@ -14,6 +14,14 @@ DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath
 
 IS_PG = bool(DATABASE_URL)
 
+@app.errorhandler(500)
+def internal_error(e):
+    return render_template('error.html', error='Something went wrong. Please try again.'), 500
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('error.html', error='Page not found.'), 404
+
 @app.context_processor
 def inject_globals():
     return dict(COMPANY_NAME=COMPANY_NAME, CURRENCY=CURRENCY)
@@ -199,11 +207,16 @@ def add_product():
         selling_price = float(request.form.get('selling_price', 0))
         notes = request.form.get('notes', '')
         conn = get_db()
-        query(conn, 'INSERT INTO products (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes) VALUES (?,?,?,?,?,?,?,?,?)',
-              (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes))
-        db_commit(conn)
+        try:
+            query(conn, 'INSERT INTO products (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes) VALUES (?,?,?,?,?,?,?,?,?)',
+                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes))
+            db_commit(conn)
+            flash('Product added successfully', 'success')
+        except Exception as e:
+            db_close(conn)
+            flash(f'Error adding product: {e}', 'danger')
+            return redirect(url_for('products'))
         db_close(conn)
-        flash('Product added successfully', 'success')
         return redirect(url_for('products'))
     return render_template('add_product.html')
 
@@ -226,13 +239,18 @@ def edit_product(id):
         buying_price = float(request.form.get('buying_price', 0))
         selling_price = float(request.form.get('selling_price', 0))
         notes = request.form.get('notes', '')
-        query(conn, '''UPDATE products SET title=?, author=?, isbn=?, publisher=?, category=?,
-                        quantity=?, buying_price=?, selling_price=?, notes=?, updated_at=CURRENT_TIMESTAMP
-                        WHERE id=?''',
-              (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, id))
-        db_commit(conn)
+        try:
+            query(conn, '''UPDATE products SET title=?, author=?, isbn=?, publisher=?, category=?,
+                            quantity=?, buying_price=?, selling_price=?, notes=?, updated_at=CURRENT_TIMESTAMP
+                            WHERE id=?''',
+                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, id))
+            db_commit(conn)
+            flash('Product updated successfully', 'success')
+        except Exception as e:
+            db_close(conn)
+            flash(f'Error updating product: {e}', 'danger')
+            return redirect(url_for('products'))
         db_close(conn)
-        flash('Product updated successfully', 'success')
         return redirect(url_for('products'))
     db_close(conn)
     return render_template('edit_product.html', product=product)
@@ -241,11 +259,16 @@ def edit_product(id):
 @login_required
 def delete_product(id):
     conn = get_db()
-    query(conn, 'DELETE FROM products WHERE id = ?', (id,))
-    query(conn, 'DELETE FROM sales WHERE product_id = ?', (id,))
-    db_commit(conn)
+    try:
+        query(conn, 'DELETE FROM sales WHERE product_id = ?', (id,))
+        query(conn, 'DELETE FROM products WHERE id = ?', (id,))
+        db_commit(conn)
+        flash('Product deleted', 'success')
+    except Exception as e:
+        db_close(conn)
+        flash(f'Error deleting product: {e}', 'danger')
+        return redirect(url_for('products'))
     db_close(conn)
-    flash('Product deleted', 'success')
     return redirect(url_for('products'))
 
 @app.route('/sales')
@@ -280,13 +303,18 @@ def add_sale():
             return redirect(url_for('add_sale'))
         total_amount = unit_price * quantity_sold
         profit = (unit_price - product['buying_price']) * quantity_sold
-        query(conn, 'INSERT INTO sales (product_id, quantity_sold, unit_price, total_amount, profit, customer_name) VALUES (?,?,?,?,?,?)',
-              (product_id, quantity_sold, unit_price, total_amount, profit, customer_name))
-        query(conn, 'UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-              (quantity_sold, product_id))
-        db_commit(conn)
+        try:
+            query(conn, 'INSERT INTO sales (product_id, quantity_sold, unit_price, total_amount, profit, customer_name) VALUES (?,?,?,?,?,?)',
+                  (product_id, quantity_sold, unit_price, total_amount, profit, customer_name))
+            query(conn, 'UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                  (quantity_sold, product_id))
+            db_commit(conn)
+            flash('Sale recorded successfully', 'success')
+        except Exception as e:
+            db_close(conn)
+            flash(f'Error recording sale: {e}', 'danger')
+            return redirect(url_for('sales'))
         db_close(conn)
-        flash('Sale recorded successfully', 'success')
         return redirect(url_for('sales'))
     products = query(conn, 'SELECT * FROM products ORDER BY title').fetchall()
     db_close(conn)
@@ -296,14 +324,19 @@ def add_sale():
 @login_required
 def delete_sale(id):
     conn = get_db()
-    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (id,)).fetchone()
-    if sale:
-        query(conn, 'UPDATE products SET quantity = quantity + ? WHERE id = ?',
-              (sale['quantity_sold'], sale['product_id']))
-        query(conn, 'DELETE FROM sales WHERE id = ?', (id,))
-        db_commit(conn)
+    try:
+        sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (id,)).fetchone()
+        if sale:
+            query(conn, 'UPDATE products SET quantity = quantity + ? WHERE id = ?',
+                  (sale['quantity_sold'], sale['product_id']))
+            query(conn, 'DELETE FROM sales WHERE id = ?', (id,))
+            db_commit(conn)
+        flash('Sale deleted', 'success')
+    except Exception as e:
+        db_close(conn)
+        flash(f'Error deleting sale: {e}', 'danger')
+        return redirect(url_for('sales'))
     db_close(conn)
-    flash('Sale deleted', 'success')
     return redirect(url_for('sales'))
 
 @app.route('/expenses')
@@ -323,11 +356,16 @@ def add_expense():
         amount = float(request.form['amount'])
         category = request.form.get('category', '')
         conn = get_db()
-        query(conn, 'INSERT INTO expenses (description, amount, category) VALUES (?,?,?)',
-              (description, amount, category))
-        db_commit(conn)
+        try:
+            query(conn, 'INSERT INTO expenses (description, amount, category) VALUES (?,?,?)',
+                  (description, amount, category))
+            db_commit(conn)
+            flash('Expense added successfully', 'success')
+        except Exception as e:
+            db_close(conn)
+            flash(f'Error adding expense: {e}', 'danger')
+            return redirect(url_for('expenses'))
         db_close(conn)
-        flash('Expense added successfully', 'success')
         return redirect(url_for('expenses'))
     return render_template('add_expense.html')
 
@@ -335,10 +373,15 @@ def add_expense():
 @login_required
 def delete_expense(id):
     conn = get_db()
-    query(conn, 'DELETE FROM expenses WHERE id = ?', (id,))
-    db_commit(conn)
+    try:
+        query(conn, 'DELETE FROM expenses WHERE id = ?', (id,))
+        db_commit(conn)
+        flash('Expense deleted', 'success')
+    except Exception as e:
+        db_close(conn)
+        flash(f'Error deleting expense: {e}', 'danger')
+        return redirect(url_for('expenses'))
     db_close(conn)
-    flash('Expense deleted', 'success')
     return redirect(url_for('expenses'))
 
 if __name__ == '__main__':
