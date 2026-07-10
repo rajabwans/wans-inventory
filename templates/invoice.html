@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Invoice #{{ sale.id }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-file-earmark-text"></i> Invoice #{{ sale.id }}</h4>
+    <div>
+        <a href="{{ url_for('invoice_pdf', sale_id=sale.id) }}" class="btn btn-dark"><i class="bi bi-download"></i> Download PDF</a>
+        <a href="{{ url_for('sales') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="row mb-4">
+            <div class="col-6">
+                <h5 class="fw-bold text-primary">{{ COMPANY_NAME }}</h5>
+                <p class="text-muted small mb-0">Inventory Management System</p>
+            </div>
+            <div class="col-6 text-end">
+                <h4 class="fw-bold">INVOICE</h4>
+                <p class="mb-0"><strong>#{{ sale.id }}</strong></p>
+                <p class="text-muted small mb-0">{{ sale_date }}</p>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <p class="text-muted small mb-1">BILL TO</p>
+                <p class="fw-bold mb-0">{{ sale.customer_name or 'Walk-in Customer' }}</p>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-end">Unit Price</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>{{ product.title }}</strong></td>
+                        <td>{{ product.category or '-' }}</td>
+                        <td class="text-center">{{ sale.quantity_sold }}</td>
+                        <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(sale.unit_price) }}</td>
+                        <td class="text-end fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(sale.total_amount) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 offset-md-6">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td class="text-end"><strong>Subtotal</strong></td>
+                            <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(sale.total_amount) }}</td>
+                        </tr>
+                        <tr class="table-success">
+                            <td class="text-end"><strong>Profit</strong></td>
+                            <td class="text-end fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(sale.profit) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <hr>
+        <p class="text-center text-muted small">{{ COMPANY_NAME }} &mdash; Thank you for your business.</p>
+    </div>
+</div>
+{% endblock %}

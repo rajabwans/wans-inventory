@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Stock Valuation Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-box-seam"></i> Stock Valuation Report</h4>
+    <div>
+        <a href="{{ url_for('stock_report_pdf') }}" class="btn btn-dark"><i class="bi bi-download"></i> Download PDF</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-primary text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Total Products</p>
+                <h4 class="fw-bold mb-0">{{ totals.total_products }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-info text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Total Units</p>
+                <h4 class="fw-bold mb-0">{{ totals.total_units }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-dark text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Total Invested</p>
+                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.total_value) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-success text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Potential Profit</p>
+                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.potential_profit) }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Qty</th>
+                        <th class="text-end">Unit Cost</th>
+                        <th class="text-end">Stock Value</th>
+                        <th class="text-end">Retail Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in products %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ p.title }}</strong></td>
+                        <td><span class="badge bg-secondary">{{ p.category or '-' }}</span></td>
+                        <td>
+                            <span class="badge {% if p.quantity <= 0 %}bg-dark{% elif p.quantity <= 5 %}bg-danger{% elif p.quantity <= 10 %}bg-warning{% else %}bg-success{% endif %}">
+                                {{ p.quantity }}
+                            </span>
+                        </td>
+                        <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(p.buying_price) }}</td>
+                        <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(p.buying_price * p.quantity) }}</td>
+                        <td class="text-end text-success fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(p.selling_price * p.quantity) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">No products in inventory.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-secondary">
+                    <tr>
+                        <td colspan="4" class="text-end fw-bold">TOTALS</td>
+                        <td class="text-end fw-bold">-</td>
+                        <td class="text-end fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(totals.total_value) }}</td>
+                        <td class="text-end fw-bold text-success">{{ CURRENCY }} {{ "{:,.0f}".format(totals.potential_revenue) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

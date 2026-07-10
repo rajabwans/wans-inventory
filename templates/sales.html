@@ -19,7 +19,7 @@
                         <th>Total</th>
                         <th>Profit</th>
                         <th>Date</th>
-                        <th>Action</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,7 +34,9 @@
                         <td class="text-success fw-bold">+ {{ CURRENCY }} {{ "{:,.0f}".format(s.profit) }}</td>
                         <td class="small">{{ s.sale_date[:10] if s.sale_date is string else s.sale_date.strftime('%Y-%m-%d') }}</td>
                         <td>
-                            <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
+                            <a href="{{ url_for('invoice', sale_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Invoice"><i class="bi bi-file-earmark-text"></i></a>
+                            <a href="{{ url_for('receipt', sale_id=s.id) }}" class="btn btn-sm btn-outline-success" title="Receipt"><i class="bi bi-receipt"></i></a>
+                            <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" class="d-inline" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
                             </form>
                         </td>

@@ -26,6 +26,14 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('sales') }}"><i class="bi bi-cart"></i> Sales</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('add_sale') }}"><i class="bi bi-cart-plus"></i> New Sale</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('expenses') }}"><i class="bi bi-receipt"></i> Expenses</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('stock_report') }}"><i class="bi bi-box-seam"></i> Stock Valuation</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('sales_report') }}"><i class="bi bi-graph-up"></i> Sales Report</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('pnl_report') }}"><i class="bi bi-cash-stack"></i> Profit & Loss</a></li>
+                        </ul>
+                    </li>
                 </ul>
                 <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a>
             </div>

@@ -1,7 +1,11 @@
 import os, sys
 import sqlite3
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
+from datetime import date, datetime
+from utils.pdf import (generate_invoice_pdf, generate_receipt_pdf,
+                        generate_stock_report_pdf, generate_sales_report_pdf,
+                        generate_pnl_report_pdf)
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
@@ -152,7 +156,6 @@ def dashboard():
     total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales').fetchone()['t']
     total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales').fetchone()['t']
     total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products').fetchone()['t']
-    from datetime import date
     first = date.today().replace(day=1)
     next_month = first.replace(month=first.month % 12 + 1, year=first.year + (first.month // 12))
     monthly_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales WHERE sale_date >= ? AND sale_date < ?',
@@ -383,6 +386,245 @@ def delete_expense(id):
         return redirect(url_for('expenses'))
     db_close(conn)
     return redirect(url_for('expenses'))
+
+
+@app.route('/invoices/<int:sale_id>')
+@login_required
+def invoice(sale_id):
+    conn = get_db()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    if not sale:
+        db_close(conn)
+        flash('Sale not found', 'danger')
+        return redirect(url_for('sales'))
+    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    db_close(conn)
+    sale_date = sale['sale_date'][:10] if isinstance(sale['sale_date'], str) else sale['sale_date'].strftime('%Y-%m-%d')
+    return render_template('invoice.html', sale=sale, product=product, sale_date=sale_date)
+
+
+@app.route('/invoices/<int:sale_id>/pdf')
+@login_required
+def invoice_pdf(sale_id):
+    conn = get_db()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    if not sale:
+        db_close(conn)
+        flash('Sale not found', 'danger')
+        return redirect(url_for('sales'))
+    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    db_close(conn)
+    buf = generate_invoice_pdf(COMPANY_NAME, CURRENCY, dict(sale), dict(product))
+    return send_file(buf, mimetype='application/pdf',
+                     download_name=f'invoice_{sale_id}.pdf', as_attachment=True)
+
+
+@app.route('/receipts/<int:sale_id>')
+@login_required
+def receipt(sale_id):
+    conn = get_db()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    if not sale:
+        db_close(conn)
+        flash('Sale not found', 'danger')
+        return redirect(url_for('sales'))
+    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    db_close(conn)
+    sale_date = sale['sale_date'][:10] if isinstance(sale['sale_date'], str) else sale['sale_date'].strftime('%Y-%m-%d')
+    return render_template('receipt.html', sale=sale, product=product, sale_date=sale_date)
+
+
+@app.route('/receipts/<int:sale_id>/pdf')
+@login_required
+def receipt_pdf(sale_id):
+    conn = get_db()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    if not sale:
+        db_close(conn)
+        flash('Sale not found', 'danger')
+        return redirect(url_for('sales'))
+    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    db_close(conn)
+    buf = generate_receipt_pdf(COMPANY_NAME, CURRENCY, dict(sale), dict(product))
+    return send_file(buf, mimetype='application/pdf',
+                     download_name=f'receipt_{sale_id}.pdf', as_attachment=True)
+
+
+@app.route('/reports/stock')
+@login_required
+def stock_report():
+    conn = get_db()
+    prods = query(conn, 'SELECT * FROM products ORDER BY category, title').fetchall()
+    db_close(conn)
+
+    total_value = sum(p['buying_price'] * p['quantity'] for p in prods)
+    potential_revenue = sum(p['selling_price'] * p['quantity'] for p in prods)
+    totals = {
+        'total_products': len(prods),
+        'total_units': sum(p['quantity'] for p in prods),
+        'total_value': total_value,
+        'potential_revenue': potential_revenue,
+        'potential_profit': potential_revenue - total_value,
+    }
+    return render_template('reports/stock.html', products=prods, totals=totals)
+
+
+@app.route('/reports/stock/pdf')
+@login_required
+def stock_report_pdf():
+    conn = get_db()
+    prods = query(conn, 'SELECT * FROM products ORDER BY category, title').fetchall()
+    db_close(conn)
+
+    total_value = sum(p['buying_price'] * p['quantity'] for p in prods)
+    potential_revenue = sum(p['selling_price'] * p['quantity'] for p in prods)
+    totals = {
+        'total_products': len(prods),
+        'total_units': sum(p['quantity'] for p in prods),
+        'total_value': total_value,
+        'potential_revenue': potential_revenue,
+        'potential_profit': potential_revenue - total_value,
+    }
+    buf = generate_stock_report_pdf(COMPANY_NAME, CURRENCY, [dict(p) for p in prods], totals)
+    return send_file(buf, mimetype='application/pdf',
+                     download_name='stock_valuation_report.pdf', as_attachment=True)
+
+
+@app.route('/reports/sales')
+@login_required
+def sales_report():
+    today = date.today()
+    date_from = request.args.get('date_from', today.replace(day=1).isoformat())
+    date_to = request.args.get('date_to', today.isoformat())
+
+    conn = get_db()
+    all_sales = query(conn, '''
+        SELECT s.*, p.title FROM sales s
+        JOIN products p ON s.product_id = p.id
+        WHERE s.sale_date >= ? AND s.sale_date <= ?
+        ORDER BY s.sale_date DESC
+    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    db_close(conn)
+
+    total_amount = sum(s['total_amount'] for s in all_sales)
+    total_profit = sum(s['profit'] for s in all_sales)
+    total_qty = sum(s['quantity_sold'] for s in all_sales)
+    totals = {
+        'total_count': len(all_sales),
+        'total_amount': total_amount,
+        'total_profit': total_profit,
+        'total_qty': total_qty,
+    }
+    return render_template('reports/sales.html', sales=all_sales, totals=totals,
+                           date_from=date_from, date_to=date_to)
+
+
+@app.route('/reports/sales/pdf')
+@login_required
+def sales_report_pdf():
+    today = date.today()
+    date_from = request.args.get('date_from', today.replace(day=1).isoformat())
+    date_to = request.args.get('date_to', today.isoformat())
+
+    conn = get_db()
+    all_sales = query(conn, '''
+        SELECT s.*, p.title FROM sales s
+        JOIN products p ON s.product_id = p.id
+        WHERE s.sale_date >= ? AND s.sale_date <= ?
+        ORDER BY s.sale_date DESC
+    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    db_close(conn)
+
+    total_amount = sum(s['total_amount'] for s in all_sales)
+    total_profit = sum(s['profit'] for s in all_sales)
+    total_qty = sum(s['quantity_sold'] for s in all_sales)
+    totals = {
+        'total_count': len(all_sales),
+        'total_amount': total_amount,
+        'total_profit': total_profit,
+        'total_qty': total_qty,
+    }
+    buf = generate_sales_report_pdf(COMPANY_NAME, CURRENCY, [dict(s) for s in all_sales],
+                                    totals, date_from, date_to)
+    return send_file(buf, mimetype='application/pdf',
+                     download_name=f'sales_report_{date_from}_to_{date_to}.pdf',
+                     as_attachment=True)
+
+
+@app.route('/reports/profit-loss')
+@login_required
+def pnl_report():
+    today = date.today()
+    date_from = request.args.get('date_from', today.replace(day=1).isoformat())
+    date_to = request.args.get('date_to', today.isoformat())
+
+    conn = get_db()
+    sales_data = query(conn, '''
+        SELECT COALESCE(SUM(total_amount), 0) as revenue,
+               COALESCE(SUM(profit), 0) as gross_profit
+        FROM sales WHERE sale_date >= ? AND sale_date <= ?
+    ''', (date_from, date_to + ' 23:59:59')).fetchone()
+    revenue = sales_data['revenue']
+    gross_profit = sales_data['gross_profit']
+    cogs = revenue - gross_profit
+
+    expenses = query(conn, '''
+        SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as amount
+        FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+        GROUP BY category ORDER BY amount DESC
+    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    total_expenses = sum(e['amount'] for e in expenses)
+    db_close(conn)
+
+    data = {
+        'revenue': revenue,
+        'cogs': cogs,
+        'gross_profit': gross_profit,
+        'total_expenses': total_expenses,
+        'net_profit': gross_profit - total_expenses,
+        'expense_breakdown': expenses,
+    }
+    return render_template('reports/profit_loss.html', data=data,
+                           date_from=date_from, date_to=date_to)
+
+
+@app.route('/reports/profit-loss/pdf')
+@login_required
+def pnl_report_pdf():
+    today = date.today()
+    date_from = request.args.get('date_from', today.replace(day=1).isoformat())
+    date_to = request.args.get('date_to', today.isoformat())
+
+    conn = get_db()
+    sales_data = query(conn, '''
+        SELECT COALESCE(SUM(total_amount), 0) as revenue,
+               COALESCE(SUM(profit), 0) as gross_profit
+        FROM sales WHERE sale_date >= ? AND sale_date <= ?
+    ''', (date_from, date_to + ' 23:59:59')).fetchone()
+    revenue = sales_data['revenue']
+    gross_profit = sales_data['gross_profit']
+    cogs = revenue - gross_profit
+
+    expenses = query(conn, '''
+        SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as amount
+        FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+        GROUP BY category ORDER BY amount DESC
+    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    total_expenses = sum(e['amount'] for e in expenses)
+    db_close(conn)
+
+    data = {
+        'revenue': revenue,
+        'cogs': cogs,
+        'gross_profit': gross_profit,
+        'total_expenses': total_expenses,
+        'net_profit': gross_profit - total_expenses,
+        'expense_breakdown': [dict(e) for e in expenses],
+    }
+    buf = generate_pnl_report_pdf(COMPANY_NAME, CURRENCY, data, date_from, date_to)
+    return send_file(buf, mimetype='application/pdf',
+                     download_name=f'pnl_report_{date_from}_to_{date_to}.pdf',
+                     as_attachment=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

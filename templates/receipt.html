@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Receipt #{{ sale.id }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-receipt"></i> Receipt #{{ sale.id }}</h4>
+    <div>
+        <a href="{{ url_for('receipt_pdf', sale_id=sale.id) }}" class="btn btn-dark"><i class="bi bi-download"></i> Download PDF</a>
+        <a href="{{ url_for('sales') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body text-center">
+        <h5 class="fw-bold text-primary">{{ COMPANY_NAME }}</h5>
+        <p class="text-muted small">Payment Receipt</p>
+        <hr>
+
+        <p class="text-muted small mb-1">Receipt #{{ sale.id }}</p>
+        <p class="text-muted small mb-3">{{ sale_date }}</p>
+
+        <table class="table table-sm mx-auto" style="max-width: 400px;">
+            <tbody>
+                <tr>
+                    <td class="text-muted">Customer</td>
+                    <td class="text-end fw-bold">{{ sale.customer_name or 'Walk-in' }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Product</td>
+                    <td class="text-end">{{ product.title }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Quantity</td>
+                    <td class="text-end">{{ sale.quantity_sold }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Unit Price</td>
+                    <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(sale.unit_price) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="bg-success text-white rounded p-3 my-3" style="max-width: 400px; margin: 0 auto;">
+            <p class="mb-1 small">TOTAL PAID</p>
+            <h3 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(sale.total_amount) }}</h3>
+        </div>
+
+        <hr>
+        <p class="text-muted small">{{ COMPANY_NAME }} &mdash; Thank you for your purchase.</p>
+    </div>
+</div>
+{% endblock %}
