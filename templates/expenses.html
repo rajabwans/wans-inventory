@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Expenses{% endblock %}
 {% block content %}
+{% from "_macros.html" import render_pagination %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="fw-bold"><i class="bi bi-receipt"></i> Expenses</h4>
+    <h4 class="fw-bold"><i class="bi bi-receipt"></i> Expenses <small class="text-muted">({{ total_count }})</small></h4>
     <a href="{{ url_for('add_expense') }}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> Add Expense</a>
 </div>
-
 <div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="card border-0 shadow-sm bg-danger text-white">
@@ -16,7 +16,6 @@
         </div>
     </div>
 </div>
-
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -41,6 +40,7 @@
                         <td class="small text-muted">{{ e.expense_date[:10] if e.expense_date is string else e.expense_date.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <form method="POST" action="{{ url_for('delete_expense', id=e.id) }}" class="d-inline" onsubmit="return confirm('Delete this expense?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                             </form>
                         </td>
@@ -53,4 +53,5 @@
         </div>
     </div>
 </div>
+{{ render_pagination(page, total_pages, 'expenses') }}
 {% endblock %}

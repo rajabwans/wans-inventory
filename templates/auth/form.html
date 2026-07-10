@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if user else 'Add' }} User{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-{{ 'pencil' if user else 'person-plus' }}"></i> {{ 'Edit' if user else 'Add' }} User</h5></div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="row g-3">
+                        {% if not user %}
+                        <div class="col-12">
+                            <label class="form-label">Username *</label>
+                            <input type="text" name="username" class="form-control" required minlength="3">
+                        </div>
+                        {% endif %}
+                        <div class="col-12">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" name="full_name" class="form-control" value="{{ user.full_name if user else '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Role *</label>
+                            <select name="role" class="form-select">
+                                <option value="staff" {% if user and user.role == 'staff' %}selected{% endif %}>Staff</option>
+                                <option value="manager" {% if user and user.role == 'manager' %}selected{% endif %}>Manager</option>
+                                <option value="admin" {% if user and user.role == 'admin' %}selected{% endif %}>Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">{{ 'New Password (leave blank to keep current)' if user else 'Password *' }}</label>
+                            <input type="password" name="password" class="form-control" {{ '' if user else 'required' }} minlength="6">
+                        </div>
+                    </div>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-dark"><i class="bi bi-check-lg"></i> {{ 'Update' if user else 'Create' }} User</button>
+                        <a href="{{ url_for('manage_users') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

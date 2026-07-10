@@ -4,11 +4,11 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold"><i class="bi bi-graph-up"></i> Sales Report</h4>
     <div>
-        <a href="{{ url_for('sales_report_pdf', date_from=date_from, date_to=date_to) }}" class="btn btn-dark"><i class="bi bi-download"></i> Download PDF</a>
+        <a href="{{ url_for('sales_report_pdf', date_from=date_from, date_to=date_to) }}" class="btn btn-dark"><i class="bi bi-file-pdf"></i> PDF</a>
+        <a href="{{ url_for('sales_report_csv', date_from=date_from, date_to=date_to) }}" class="btn btn-success"><i class="bi bi-filetype-csv"></i> CSV</a>
         <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
     </div>
 </div>
-
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="GET" action="{{ url_for('sales_report') }}" class="row g-3 align-items-end">
@@ -27,56 +27,35 @@
         </form>
     </div>
 </div>
-
 <div class="row g-3 mb-4">
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-primary text-white">
-            <div class="card-body">
-                <p class="small opacity-75 mb-1">Total Sales</p>
-                <h4 class="fw-bold mb-0">{{ totals.total_count }}</h4>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm bg-primary text-white"><div class="card-body">
+            <p class="small opacity-75 mb-1">Total Sales</p><h4 class="fw-bold mb-0">{{ totals.total_count }}</h4>
+        </div></div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-info text-white">
-            <div class="card-body">
-                <p class="small opacity-75 mb-1">Revenue</p>
-                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.total_amount) }}</h4>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm bg-info text-white"><div class="card-body">
+            <p class="small opacity-75 mb-1">Revenue</p><h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.total_amount) }}</h4>
+        </div></div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-success text-white">
-            <div class="card-body">
-                <p class="small opacity-75 mb-1">Profit</p>
-                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.total_profit) }}</h4>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm bg-success text-white"><div class="card-body">
+            <p class="small opacity-75 mb-1">Profit</p><h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.total_profit) }}</h4>
+        </div></div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm bg-warning text-dark">
-            <div class="card-body">
-                <p class="small opacity-75 mb-1">Margin</p>
-                <h4 class="fw-bold mb-0">{% if totals.total_amount > 0 %}{{ "{:,.1f}".format(totals.total_profit / totals.total_amount * 100) }}%{% else %}0%{% endif %}</h4>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm bg-warning text-dark"><div class="card-body">
+            <p class="small opacity-75 mb-1">Margin</p>
+            <h4 class="fw-bold mb-0">{% if totals.total_amount > 0 %}{{ "{:,.1f}".format(totals.total_profit / totals.total_amount * 100) }}%{% else %}0%{% endif %}</h4>
+        </div></div>
     </div>
 </div>
-
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="table-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>Date</th>
-                        <th>Product</th>
-                        <th>Customer</th>
-                        <th class="text-center">Qty</th>
-                        <th class="text-end">Amount</th>
-                        <th class="text-end">Profit</th>
-                    </tr>
+                    <tr><th>#</th><th>Date</th><th>Product</th><th>Customer</th><th class="text-center">Qty</th><th class="text-end">Amount</th><th class="text-end">Profit</th></tr>
                 </thead>
                 <tbody>
                     {% for s in sales %}

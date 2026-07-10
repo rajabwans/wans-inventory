@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Stock Adjustments{% endblock %}
+{% block content %}
+{% from "_macros.html" import render_pagination %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-arrow-left-right"></i> Stock Adjustments <small class="text-muted">({{ total }})</small></h4>
+    <a href="{{ url_for('products') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Products</a>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr><th>#</th><th>Date</th><th>Product</th><th>Type</th><th>Qty</th><th>Reason</th><th>User</th></tr>
+                </thead>
+                <tbody>
+                    {% for a in adjustments %}
+                    <tr>
+                        <td>{{ a.id }}</td>
+                        <td class="small">{{ a.created_at[:10] if a.created_at is string else a.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td><strong>{{ a.title }}</strong></td>
+                        <td>
+                            <span class="badge {% if a.adjustment_type == 'damaged' %}bg-danger{% elif a.adjustment_type == 'stolen' %}bg-dark{% elif a.adjustment_type == 'returned' %}bg-success{% elif a.adjustment_type == 'restock' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
+                                {{ a.adjustment_type }}
+                            </span>
+                        </td>
+                        <td>{{ a.quantity }}</td>
+                        <td>{{ a.reason or '-' }}</td>
+                        <td>{{ a.username or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">No stock adjustments recorded.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{{ render_pagination(page, total_pages, 'stock_adjustments') }}
+{% endblock %}

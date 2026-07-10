@@ -2,62 +2,72 @@
 {% block title %}New Sale{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-8 col-lg-6">
         <div class="card shadow-sm">
-            <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-cart-plus"></i> Record Sale</h5></div>
+            <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-cart-plus"></i> Record New Sale</h5></div>
             <div class="card-body">
-                <form method="POST" id="saleForm">
-                    <div class="mb-3">
-                        <label class="form-label">Product *</label>
-                        <select name="product_id" class="form-select" id="productSelect" required>
-                            <option value="">Select product...</option>
-                            {% for p in products %}
-                            <option value="{{ p.id }}" data-price="{{ p.selling_price }}" data-buy="{{ p.buying_price }}" data-qty="{{ p.quantity }}">
-                                {{ p.title }} (Stock: {{ p.quantity }}, Price: {{ CURRENCY }} {{ "{:,.0f}".format(p.selling_price) }})
-                            </option>
-                            {% endfor %}
-                        </select>
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Product *</label>
+                            <select name="product_id" class="form-select" required id="productSelect" onchange="updatePrice()">
+                                <option value="">Select product...</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}" data-price="{{ p.selling_price }}" data-buy="{{ p.buying_price }}" data-stock="{{ p.quantity }}">
+                                    {{ p.title }} (Stock: {{ p.quantity }}) - {{ CURRENCY }} {{ "{:,.0f}".format(p.selling_price) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Customer</label>
+                            <select name="customer_id" class="form-select">
+                                <option value="">Walk-in customer</option>
+                                {% for c in customers %}
+                                <option value="{{ c.id }}">{{ c.name }}{% if c.phone %} ({{ c.phone }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Or Customer Name</label>
+                            <input type="text" name="customer_name" class="form-control" placeholder="Quick entry">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Quantity *</label>
+                            <input type="number" name="quantity" class="form-control" value="1" min="1" required id="qtyInput" onchange="calcTotal()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Unit Price ({{ CURRENCY }}) *</label>
+                            <input type="number" step="1" name="unit_price" class="form-control" value="0" min="0" required id="priceInput" onchange="calcTotal()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Total</label>
+                            <input type="text" class="form-control" id="totalDisplay" readonly value="{{ CURRENCY }} 0">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Quantity *</label>
-                        <input type="number" name="quantity" class="form-control" id="qtyInput" value="1" min="1" required>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-dark"><i class="bi bi-check-lg"></i> Record Sale</button>
+                        <a href="{{ url_for('sales') }}" class="btn btn-outline-secondary">Cancel</a>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Unit Price ({{ CURRENCY }}) *</label>
-                        <input type="number" step="1" name="unit_price" class="form-control" id="priceInput" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Customer Name</label>
-                        <input type="text" name="customer_name" class="form-control" placeholder="Optional">
-                    </div>
-                    <div class="alert alert-info" id="preview">
-                        Total: {{ CURRENCY }} 0 | Profit: {{ CURRENCY }} 0
-                    </div>
-                    <button type="submit" class="btn btn-dark w-100"><i class="bi bi-check-lg"></i> Record Sale</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 <script>
-    function updatePreview() {
-        const sel = document.getElementById('productSelect');
-        const qty = parseInt(document.getElementById('qtyInput').value) || 0;
-        const price = parseFloat(document.getElementById('priceInput').value) || 0;
-        const opt = sel.options[sel.selectedIndex];
-        if (opt && opt.value) {
-            const buy = parseFloat(opt.dataset.buy) || 0;
-            const total = price * qty;
-            const profit = (price - buy) * qty;
-            document.getElementById('preview').innerHTML = `Total: {{ CURRENCY }} ${total.toFixed(0)} | Profit: {{ CURRENCY }} ${profit.toFixed(0)}`;
-        }
+function updatePrice() {
+    var sel = document.getElementById('productSelect');
+    var opt = sel.options[sel.selectedIndex];
+    if (opt.value) {
+        document.getElementById('priceInput').value = opt.dataset.price;
+        calcTotal();
     }
-    document.getElementById('productSelect').addEventListener('change', function() {
-        const opt = this.options[this.selectedIndex];
-        if (opt && opt.value) document.getElementById('priceInput').value = opt.dataset.price;
-        updatePreview();
-    });
-    document.getElementById('qtyInput').addEventListener('input', updatePreview);
-    document.getElementById('priceInput').addEventListener('input', updatePreview);
+}
+function calcTotal() {
+    var qty = parseInt(document.getElementById('qtyInput').value) || 0;
+    var price = parseFloat(document.getElementById('priceInput').value) || 0;
+    document.getElementById('totalDisplay').value = '{{ CURRENCY }} ' + (qty * price).toLocaleString();
+}
 </script>
 {% endblock %}

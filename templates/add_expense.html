@@ -2,36 +2,38 @@
 {% block title %}Add Expense{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-6 col-lg-4">
         <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <strong><i class="bi bi-receipt"></i> Record Expense</strong>
-            </div>
+            <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-plus-circle"></i> Add Expense</h5></div>
             <div class="card-body">
                 <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Description *</label>
-                        <input type="text" name="description" class="form-control" placeholder="What was it for?" required>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Description *</label>
+                            <input type="text" name="description" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Amount ({{ CURRENCY }}) *</label>
+                            <input type="number" step="1" name="amount" class="form-control" min="1" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Category</label>
+                            <select name="category" class="form-select">
+                                <option value="">Select category...</option>
+                                <option>Rent</option>
+                                <option>Utilities</option>
+                                <option>Transport</option>
+                                <option>Salaries</option>
+                                <option>Marketing</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Amount ({{ CURRENCY }}) *</label>
-                        <input type="number" step="1" name="amount" class="form-control" value="0" min="1" required>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-dark"><i class="bi bi-check-lg"></i> Save Expense</button>
+                        <a href="{{ url_for('expenses') }}" class="btn btn-outline-secondary">Cancel</a>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Category</label>
-                        <select name="category" class="form-select">
-                            <option value="">Select category...</option>
-                            <option>Transport</option>
-                            <option>Utilities</option>
-                            <option>Supplies</option>
-                            <option>Maintenance</option>
-                            <option>Marketing</option>
-                            <option>Salaries</option>
-                            <option>Rent</option>
-                            <option>Other</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-dark w-100"><i class="bi bi-check-lg"></i> Save Expense</button>
                 </form>
             </div>
         </div>

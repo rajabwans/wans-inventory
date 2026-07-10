@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-person"></i> {{ customer.name }}</h4>
+    <div>
+        <a href="{{ url_for('edit_customer', id=customer.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+        <a href="{{ url_for('customers') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-primary text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Total Orders</p>
+                <h4 class="fw-bold mb-0">{{ sales|length }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-info text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Items Bought</p>
+                <h4 class="fw-bold mb-0">{{ total_items }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-success text-white">
+            <div class="card-body">
+                <p class="small opacity-75 mb-1">Total Spent</p>
+                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_spent) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <p class="small text-muted mb-1">Contact</p>
+                <p class="mb-0"><i class="bi bi-telephone"></i> {{ customer.phone or 'N/A' }}</p>
+                <p class="mb-0 small text-muted"><i class="bi bi-envelope"></i> {{ customer.email or 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white"><strong>Purchase History</strong></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr><th>#</th><th>Product</th><th>Qty</th><th>Total</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in sales %}
+                    <tr>
+                        <td>{{ s.id }}</td>
+                        <td><strong>{{ s.title }}</strong></td>
+                        <td>{{ s.quantity_sold }}</td>
+                        <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.total_amount) }}</td>
+                        <td class="small">{{ s.sale_date[:10] if s.sale_date is string else s.sale_date.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">No purchases yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

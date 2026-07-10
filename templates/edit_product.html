@@ -7,6 +7,7 @@
             <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-pencil"></i> Edit Product</h5></div>
             <div class="card-body">
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label">Title *</label>

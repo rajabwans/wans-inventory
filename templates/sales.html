@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Sales{% endblock %}
 {% block content %}
+{% from "_macros.html" import render_pagination %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="fw-bold"><i class="bi bi-cart"></i> Sales History</h4>
+    <h4 class="fw-bold"><i class="bi bi-cart"></i> Sales History <small class="text-muted">({{ total }})</small></h4>
     <a href="{{ url_for('add_sale') }}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> New Sale</a>
 </div>
 <div class="card shadow-sm">
@@ -27,7 +28,7 @@
                     <tr>
                         <td>{{ s.id }}</td>
                         <td><strong>{{ s.title }}</strong></td>
-                        <td>{{ s.customer_name or '-' }}</td>
+                        <td>{{ s.customer_display }}</td>
                         <td>{{ s.quantity_sold }}</td>
                         <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.unit_price) }}</td>
                         <td>{{ CURRENCY }} {{ "{:,.0f}".format(s.total_amount) }}</td>
@@ -37,6 +38,7 @@
                             <a href="{{ url_for('invoice', sale_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Invoice"><i class="bi bi-file-earmark-text"></i></a>
                             <a href="{{ url_for('receipt', sale_id=s.id) }}" class="btn btn-sm btn-outline-success" title="Receipt"><i class="bi bi-receipt"></i></a>
                             <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" class="d-inline" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
                             </form>
                         </td>
@@ -49,4 +51,5 @@
         </div>
     </div>
 </div>
+{{ render_pagination(page, total_pages, 'sales') }}
 {% endblock %}

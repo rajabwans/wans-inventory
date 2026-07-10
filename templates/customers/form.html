@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if customer else 'Add' }} Customer{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-{{ 'pencil' if customer else 'plus-circle' }}"></i> {{ 'Edit' if customer else 'Add' }} Customer</h5></div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Name *</label>
+                            <input type="text" name="name" class="form-control" value="{{ customer.name if customer else '' }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Phone</label>
+                            <input type="text" name="phone" class="form-control" value="{{ customer.phone if customer else '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control" value="{{ customer.email if customer else '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Address</label>
+                            <textarea name="address" class="form-control" rows="2">{{ customer.address if customer else '' }}</textarea>
+                        </div>
+                    </div>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-dark"><i class="bi bi-check-lg"></i> {{ 'Update' if customer else 'Save' }} Customer</button>
+                        <a href="{{ url_for('customers') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -4,11 +4,11 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold"><i class="bi bi-cash-stack"></i> Profit & Loss Statement</h4>
     <div>
-        <a href="{{ url_for('pnl_report_pdf', date_from=date_from, date_to=date_to) }}" class="btn btn-dark"><i class="bi bi-download"></i> Download PDF</a>
+        <a href="{{ url_for('pnl_report_pdf', date_from=date_from, date_to=date_to) }}" class="btn btn-dark"><i class="bi bi-file-pdf"></i> PDF</a>
+        <a href="{{ url_for('pnl_report_csv', date_from=date_from, date_to=date_to) }}" class="btn btn-success"><i class="bi bi-filetype-csv"></i> CSV</a>
         <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
     </div>
 </div>
-
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="GET" action="{{ url_for('pnl_report') }}" class="row g-3 align-items-end">
@@ -27,57 +27,36 @@
         </form>
     </div>
 </div>
-
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card shadow-sm">
             <div class="card-body">
                 <h5 class="fw-bold mb-3">REVENUE</h5>
-                <table class="table table-sm">
-                    <tbody>
-                        <tr>
-                            <td>Sales Revenue</td>
-                            <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(data.revenue) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
+                <table class="table table-sm"><tbody>
+                    <tr><td>Sales Revenue</td><td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(data.revenue) }}</td></tr>
+                </tbody></table>
                 <h5 class="fw-bold mb-3 mt-4">COST OF GOODS SOLD</h5>
-                <table class="table table-sm">
-                    <tbody>
-                        <tr>
-                            <td>Cost of Products Sold</td>
-                            <td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(data.cogs) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
+                <table class="table table-sm"><tbody>
+                    <tr><td>Cost of Products Sold</td><td class="text-end">{{ CURRENCY }} {{ "{:,.0f}".format(data.cogs) }}</td></tr>
+                </tbody></table>
                 <div class="bg-light rounded p-3 my-3">
                     <h6 class="fw-bold mb-0">GROSS PROFIT</h6>
                     <h4 class="fw-bold mb-0 {% if data.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
                         {{ CURRENCY }} {{ "{:,.0f}".format(data.gross_profit) }}
                     </h4>
                 </div>
-
                 <h5 class="fw-bold mb-3">OPERATING EXPENSES</h5>
                 <table class="table table-sm">
                     <thead><tr><th>Category</th><th class="text-end">Amount</th></tr></thead>
                     <tbody>
                         {% for exp in data.expense_breakdown %}
-                        <tr>
-                            <td>{{ exp.category or 'Uncategorized' }}</td>
-                            <td class="text-end text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(exp.amount) }}</td>
-                        </tr>
+                        <tr><td>{{ exp.category or 'Uncategorized' }}</td><td class="text-end text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(exp.amount) }}</td></tr>
                         {% else %}
                         <tr><td colspan="2" class="text-muted text-center">No expenses in this period</td></tr>
                         {% endfor %}
-                        <tr class="table-secondary">
-                            <td class="fw-bold">Total Expenses</td>
-                            <td class="text-end fw-bold text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(data.total_expenses) }}</td>
-                        </tr>
+                        <tr class="table-secondary"><td class="fw-bold">Total Expenses</td><td class="text-end fw-bold text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(data.total_expenses) }}</td></tr>
                     </tbody>
                 </table>
-
                 <div class="rounded p-3 mt-4 {% if data.net_profit >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
                     <h5 class="fw-bold mb-0">NET PROFIT</h5>
                     <h2 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(data.net_profit) }}</h2>
@@ -85,7 +64,6 @@
             </div>
         </div>
     </div>
-
     <div class="col-lg-4">
         <div class="card shadow-sm">
             <div class="card-header bg-white"><strong>Summary</strong></div>
@@ -93,21 +71,14 @@
                 <p class="small text-muted mb-1">Period</p>
                 <p class="fw-bold">{{ date_from }} to {{ date_to }}</p>
                 <hr>
-                <p class="small text-muted mb-1">Revenue</p>
-                <p class="fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(data.revenue) }}</p>
-                <p class="small text-muted mb-1">COGS</p>
-                <p class="fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(data.cogs) }}</p>
-                <p class="small text-muted mb-1">Gross Profit</p>
-                <p class="fw-bold {% if data.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    {{ CURRENCY }} {{ "{:,.0f}".format(data.gross_profit) }}
-                </p>
-                <p class="small text-muted mb-1">Expenses</p>
-                <p class="fw-bold text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(data.total_expenses) }}</p>
+                <p class="small text-muted mb-0">Revenue</p><p class="fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(data.revenue) }}</p>
+                <p class="small text-muted mb-0">COGS</p><p class="fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(data.cogs) }}</p>
+                <p class="small text-muted mb-0">Gross Profit</p>
+                <p class="fw-bold {% if data.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ CURRENCY }} {{ "{:,.0f}".format(data.gross_profit) }}</p>
+                <p class="small text-muted mb-0">Expenses</p><p class="fw-bold text-danger">{{ CURRENCY }} {{ "{:,.0f}".format(data.total_expenses) }}</p>
                 <hr>
-                <p class="small text-muted mb-1">Net Profit</p>
-                <h4 class="fw-bold {% if data.net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    {{ CURRENCY }} {{ "{:,.0f}".format(data.net_profit) }}
-                </h4>
+                <p class="small text-muted mb-0">Net Profit</p>
+                <h4 class="fw-bold {% if data.net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ CURRENCY }} {{ "{:,.0f}".format(data.net_profit) }}</h4>
                 {% if data.revenue > 0 %}
                 <p class="small text-muted mt-2">Net Margin: <strong>{{ "{:,.1f}".format(data.net_profit / data.revenue * 100) }}%</strong></p>
                 {% endif %}
