@@ -2,5 +2,5 @@ flask
 gunicorn
 psycopg2-binary
 reportlab
-flask-wtf
+flask-wtf>=1.2.0
 flask-limiter

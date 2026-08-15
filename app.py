@@ -4,7 +4,7 @@ from functools import wraps
 from datetime import date, datetime, timedelta
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, session, send_file, abort, g)
-from flask_wtf.csrf import CSRF
+from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -15,7 +15,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-csrf = CSRF(app)
+csrf = CSRFProtect()
+csrf.init_app(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=["500 per day"])
 
 PASSWORD = os.environ.get('APP_PASSWORD', 'wans123')
