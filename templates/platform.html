@@ -5,6 +5,9 @@
     <h4 class="fw-bold mb-0"><i class="bi bi-globe2"></i> All Businesses</h4>
     <span class="badge bg-secondary">{{ businesses|length }} total</span>
 </div>
+<div class="alert alert-info small py-2">
+    <i class="bi bi-phone"></i> Accept Pro payments via <strong>Mobile Money: {{ PAYMENT_PHONE }}</strong>{% if PRO_PRICE %} — {{ PRO_PRICE }}{% endif %}. Set the paid-until date below after you confirm a payment.
+</div>
 <div class="card shadow">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">

@@ -47,6 +47,13 @@
                     <p class="text-center text-muted small mt-3 mb-0">
                         Your account is activated after review. Already registered? <a href="{{ url_for('login') }}">Login</a>
                     </p>
+                    <hr>
+                    <div class="alert alert-info small text-start mb-0">
+                        <div class="fw-bold"><i class="bi bi-phone"></i> Pro plan — pay by Mobile Money</div>
+                        {% if PRO_PRICE %}<div class="mb-1">{{ PRO_PRICE }}</div>{% endif %}
+                        <div class="mb-1">Send to: <span class="fw-bold text-dark">{{ PAYMENT_PHONE }}</span></div>
+                        <div class="text-muted">After sending, request the upgrade in your Billing page and we'll activate it.</div>
+                    </div>
                 </form>
             </div>
         </div>

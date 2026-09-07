@@ -32,7 +32,15 @@
                         <button class="btn btn-primary w-100"><i class="bi bi-stars"></i> Request upgrade to Pro</button>
                     {% endif %}
                 </form>
-                <div class="form-text small mt-2">We'll contact you with the monthly price.</div>
+                {% if plan != 'pro' %}
+                <div class="alert alert-info small mt-3 mb-0 text-start">
+                    <div class="fw-bold mb-1"><i class="bi bi-phone"></i> How to pay (Mobile Money)</div>
+                    {% if PRO_PRICE %}<div class="mb-1">{{ PRO_PRICE }}</div>{% endif %}
+                    <div class="mb-1">Send to: <span class="fw-bold fs-6 text-dark" style="font-size:1.1rem !important;">{{ PAYMENT_PHONE }}</span></div>
+                    <div class="mb-1">Name: {{ COMPANY_NAME }}</div>
+                    <div class="text-muted">Then tap "Request upgrade" above. Your Pro plan is activated once your payment is confirmed.</div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

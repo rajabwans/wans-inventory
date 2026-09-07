@@ -22,6 +22,8 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["500 per day"])
 PASSWORD = os.environ.get('APP_PASSWORD', 'wans123')
 COMPANY_NAME = os.environ.get('COMPANY_NAME', 'WANS COLLECTION')
 CURRENCY = os.environ.get('CURRENCY', 'UGX')
+PAYMENT_PHONE = os.environ.get('PAYMENT_PHONE', '0763750114')
+PRO_PRICE = os.environ.get('PRO_PRICE', "")  # e.g. "UGX 20,000 / month"
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inventory.db'))
 
 IS_PG = bool(DATABASE_URL)
@@ -78,7 +80,9 @@ def inject_globals():
     return dict(COMPANY_NAME=biz.get('name') or COMPANY_NAME,
                 CURRENCY=biz.get('currency') or CURRENCY,
                 TENANT_SLUG=biz.get('slug') or '',
-                CURRENT_PLAN=get_effective_plan())
+                CURRENT_PLAN=get_effective_plan(),
+                PAYMENT_PHONE=PAYMENT_PHONE,
+                PRO_PRICE=PRO_PRICE)
 
 if IS_PG:
     import psycopg2
