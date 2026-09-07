@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}All Businesses{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-globe2"></i> All Businesses</h4>
+    <span class="badge bg-secondary">{{ businesses|length }} total</span>
+</div>
+<div class="card shadow">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Business</th>
+                    <th>Status</th>
+                    <th>Plan</th>
+                    <th>Paid until</th>
+                    <th>Products</th>
+                    <th>Users</th>
+                    <th>Upgrade req</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in businesses %}
+                <tr>
+                    <td>
+                        <div class="fw-bold">{{ b['name'] }}</div>
+                        <small class="text-muted">{{ b['slug'] }} · {{ b['currency'] }}</small>
+                    </td>
+                    <td>
+                        {% if b['status'] == 'active' %}<span class="badge bg-success">Active</span>
+                        {% elif b['status'] == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+                        {% elif b['status'] == 'suspended' %}<span class="badge bg-danger">Suspended</span>
+                        {% else %}<span class="badge bg-secondary">Rejected</span>{% endif %}
+                    </td>
+                    <td><span class="badge {% if b['plan']=='pro' %}bg-primary{% else %}bg-light text-dark border{% endif %}">{{ b['plan'] or 'free' }}</span></td>
+                    <td>
+                        {% if b['plan']=='pro' %}
+                            {{ (b['paid_until'] or 'never')[:10] if b['paid_until'] else 'never' }}
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>{{ b['product_count'] }}</td>
+                    <td>{{ b['user_count'] }}</td>
+                    <td>{% if b['upgrade_requested'] %}<span class="badge bg-warning text-dark">Requested</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                        {% if b['status'] == 'pending' %}
+                            <form method="POST" action="{{ url_for('platform_approve', id=b['id']) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><button class="btn btn-sm btn-success">Approve</button></form>
+                            <form method="POST" action="{{ url_for('platform_reject', id=b['id']) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><button class="btn btn-sm btn-outline-danger">Reject</button></form>
+                        {% elif b['status'] == 'active' %}
+                            <form method="POST" action="{{ url_for('platform_suspend', id=b['id']) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><button class="btn btn-sm btn-outline-danger">Suspend</button></form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('platform_approve', id=b['id']) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><button class="btn btn-sm btn-outline-success">Re-activate</button></form>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#planModal{{ b['id'] }}">Plan</button>
+                        </div>
+                        <div class="modal fade" id="planModal{{ b['id'] }}" tabindex="-1">
+                            <div class="modal-dialog modal-sm">
+                                <div class="modal-content">
+                                    <form method="POST" action="{{ url_for('platform_set_plan', id=b['id']) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <div class="modal-header"><h6 class="modal-title">Set plan — {{ b['name'] }}</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                        <div class="modal-body">
+                                            <div class="mb-2">
+                                                <label class="form-label small fw-bold">Plan</label>
+                                                <select name="plan" class="form-select">
+                                                    <option value="free" {% if b['plan']!='pro' %}selected{% endif %}>Free</option>
+                                                    <option value="pro" {% if b['plan']=='pro' %}selected{% endif %}>Pro (unlimited)</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small fw-bold">Paid until (date)</label>
+                                                <input type="date" name="paid_until" class="form-control" value="{{ (b['paid_until'] or '')[:10] }}">
+                                            </div>
+                                            <div class="form-text">Empty paid-until = never expires (lifetime). Pro plan counts as active while paid.</div>
+                                        </div>
+                                        <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">No businesses yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -40,12 +40,45 @@ def not_found(e):
 def rate_limited(e):
     return render_template('error.html', error='Too many requests. Please slow down.'), 429
 
+@app.before_request
+def refresh_biz():
+    if session.get('user_id') and session.get('biz'):
+        bid = session['biz'].get('id')
+        if bid:
+            conn = get_db()
+            try:
+                biz = query(conn, 'SELECT * FROM businesses WHERE id = ?', (bid,)).fetchone()
+                if biz:
+                    session['biz']['plan'] = biz['plan'] or 'free'
+                    session['biz']['status'] = biz['status']
+                    session['biz']['paid_until'] = biz['paid_until']
+                    session['biz']['name'] = biz['name']
+                    session['biz']['currency'] = biz['currency']
+                    session['biz']['logo'] = biz['logo']
+                elif session.get('role') != 'superadmin':
+                    session.clear()
+                    return redirect(url_for('login'))
+            except Exception:
+                pass
+            db_close(conn)
+
+@app.before_request
+def block_suspended():
+    if session.get('user_id'):
+        status = session.get('biz', {}).get('status')
+        if status == 'suspended':
+            session.clear()
+            return redirect(url_for('login'))
+        if status == 'pending' and request.endpoint not in ('logout', 'static'):
+            return render_template('error.html', error='Your business is still awaiting approval.'), 403
+
 @app.context_processor
 def inject_globals():
     biz = session.get('biz', {})
     return dict(COMPANY_NAME=biz.get('name') or COMPANY_NAME,
                 CURRENCY=biz.get('currency') or CURRENCY,
-                TENANT_SLUG=biz.get('slug') or '')
+                TENANT_SLUG=biz.get('slug') or '',
+                CURRENT_PLAN=get_effective_plan())
 
 if IS_PG:
     import psycopg2
@@ -85,7 +118,9 @@ SCHEMA_SQLITE = '''
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
         currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
-        plan TEXT DEFAULT 'free', is_active INTEGER DEFAULT 1,
+        plan TEXT DEFAULT 'free', status TEXT DEFAULT 'pending',
+        paid_until TIMESTAMP, upgrade_requested INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS users (
@@ -146,7 +181,9 @@ SCHEMA_PG = '''
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
         currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
-        plan TEXT DEFAULT 'free', is_active BOOLEAN DEFAULT TRUE,
+        plan TEXT DEFAULT 'free', status TEXT DEFAULT 'pending',
+        paid_until TIMESTAMP, upgrade_requested BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS users (
@@ -210,6 +247,9 @@ MIGRATION_SQLITE = [
     "ALTER TABLE expenses ADD COLUMN business_id INTEGER DEFAULT 1",
     "ALTER TABLE stock_adjustments ADD COLUMN business_id INTEGER DEFAULT 1",
     "ALTER TABLE audit_log ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE businesses ADD COLUMN status TEXT DEFAULT 'pending'",
+    "ALTER TABLE businesses ADD COLUMN paid_until TIMESTAMP",
+    "ALTER TABLE businesses ADD COLUMN upgrade_requested INTEGER DEFAULT 0",
 ]
 
 MIGRATION_PG = [
@@ -223,6 +263,9 @@ MIGRATION_PG = [
     "ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
     "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS upgrade_requested BOOLEAN DEFAULT FALSE",
 ]
 
 def init_db():
@@ -255,11 +298,14 @@ def create_default_business():
     try:
         existing = query(conn, "SELECT id FROM businesses WHERE slug = 'wans'").fetchone()
         if not existing:
-            query(conn, "INSERT INTO businesses (name, slug, currency, about, plan) VALUES (?,?,?,?,?)",
+            query(conn, "INSERT INTO businesses (name, slug, currency, about, plan, status) VALUES (?,?,?,?,?,?)",
                   ('WANS COLLECTION', 'wans', 'UGX',
-                   'WANS COLLECTION official inventory system', 'pro'))
+                   'WANS COLLECTION official inventory system', 'pro', 'active'))
             db_commit(conn)
             print('[INFO] Default business created: WANS COLLECTION (slug: wans)', file=sys.stderr)
+        else:
+            query(conn, "UPDATE businesses SET status = 'active' WHERE slug = 'wans'")
+            db_commit(conn)
     except Exception as e:
         print(f'[BUSINESS INIT ERROR] {e}', file=sys.stderr)
     db_close(conn)
@@ -272,9 +318,12 @@ def create_default_admin():
             pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
             pw_hash = generate_password_hash(pw)
             query(conn, "INSERT INTO users (business_id, username, password_hash, full_name, role) VALUES (?,?,?,?,?)",
-                  (1, 'admin', pw_hash, 'Administrator', 'admin'))
+                  (1, 'admin', pw_hash, 'Administrator', 'superadmin'))
             db_commit(conn)
             print(f'[INFO] Default admin created. Username: admin, Password: {pw}', file=sys.stderr)
+        else:
+            query(conn, "UPDATE users SET role = 'superadmin' WHERE username = 'admin' AND business_id = 1")
+            db_commit(conn)
     except Exception as e:
         print(f'[ADMIN INIT ERROR] {e}', file=sys.stderr)
     db_close(conn)
@@ -296,8 +345,19 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         if not session.get('user_id'):
             return redirect(url_for('login'))
-        if session.get('role') != 'admin':
+        if session.get('role') not in ('admin', 'superadmin'):
             flash('Admin access required', 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+def superadmin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('user_id'):
+            return redirect(url_for('login'))
+        if session.get('role') != 'superadmin':
+            flash('Superadmin access required', 'danger')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated
@@ -314,6 +374,39 @@ def get_current_user():
 
 def get_business_id():
     return session.get('biz', {}).get('id') or session.get('business_id') or 1
+
+PLAN_LIMITS = {
+    'free': {'products': 50, 'users': 2, 'customers': 100},
+    'pro': {'products': None, 'users': None, 'customers': None},
+}
+
+def get_effective_plan():
+    biz = session.get('biz', {})
+    plan = biz.get('plan') or 'free'
+    if plan == 'pro':
+        paid_until = biz.get('paid_until')
+        if paid_until:
+            try:
+                if isinstance(paid_until, str):
+                    exp = datetime.strptime(paid_until[:10], '%Y-%m-%d').date()
+                else:
+                    exp = paid_until.date() if hasattr(paid_until, 'date') else paid_until
+                if date.today() > exp:
+                    return 'free'
+            except Exception:
+                return 'free'
+        return 'pro'
+    return 'free'
+
+def check_limit(conn, kind):
+    """Return True if the current business is allowed to add more rows of `kind`."""
+    limits = PLAN_LIMITS.get(get_effective_plan(), PLAN_LIMITS['free'])
+    cap = limits.get(kind)
+    if cap is None:
+        return True
+    bid = get_business_id()
+    count = query(conn, f'SELECT COUNT(*) as c FROM {kind} WHERE business_id = ?', (bid,)).fetchone()['c']
+    return count < cap
 
 def log_audit(conn, action, table_name, record_id=None, details=None, business_id=None):
     try:
@@ -433,19 +526,28 @@ def login():
             flash('Username, business slug and password required', 'danger')
             return render_template('login.html', slug=slug)
         conn = get_db()
-        user = query(conn, '''SELECT u.*, b.name as business_name, b.currency, b.slug, b.logo
+        user = query(conn, '''SELECT u.*, b.name as business_name, b.currency, b.slug, b.logo,
+                                     b.status as biz_status, b.plan as biz_plan, b.paid_until
                               FROM users u JOIN businesses b ON u.business_id = b.id
                               WHERE u.username = ? AND b.slug = ?''',
                      (username, slug)).fetchone()
         db_close(conn)
         if user and check_password_hash(user['password_hash'], password):
+            if user['biz_status'] == 'pending':
+                flash('Your business is awaiting approval. You will be notified once activated.', 'warning')
+                return render_template('login.html', slug=slug)
+            if user['biz_status'] == 'suspended':
+                flash('Your business has been suspended. Contact support.', 'danger')
+                return render_template('login.html', slug=slug)
             session.clear()
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
             session['full_name'] = user['full_name'] or user['username']
             session['biz'] = {'id': user['business_id'], 'name': user['business_name'],
-                              'currency': user['currency'], 'slug': user['slug'], 'logo': user['logo']}
+                              'currency': user['currency'], 'slug': user['slug'], 'logo': user['logo'],
+                              'plan': user['biz_plan'] or 'free', 'paid_until': user['paid_until'],
+                              'status': user['biz_status']}
             session.permanent = True
             app.permanent_session_lifetime = timedelta(hours=12)
             return redirect(url_for('dashboard'))
@@ -540,6 +642,10 @@ def add_product():
         conn = get_db()
         bid = get_business_id()
         try:
+            if not check_limit(conn, 'products'):
+                flash(f'Product limit reached on your {get_effective_plan().capitalize()} plan. Please upgrade.', 'warning')
+                db_close(conn)
+                return redirect(url_for('products'))
             query(conn, 'INSERT INTO products (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes) VALUES (?,?,?,?,?,?,?,?,?,?)',
                   (bid, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes))
             db_commit(conn)
@@ -838,6 +944,10 @@ def add_customer():
         address = sanitize_input(request.form.get('address', ''))
         conn = get_db()
         bid = get_business_id()
+        if not check_limit(conn, 'customers'):
+            flash(f'Customer limit reached on your {get_effective_plan().capitalize()} plan. Please upgrade.', 'warning')
+            db_close(conn)
+            return redirect(url_for('customers'))
         try:
             query(conn, 'INSERT INTO customers (business_id, name, phone, email, address) VALUES (?,?,?,?,?)',
                   (bid, name, phone, email, address))
@@ -1273,6 +1383,113 @@ def manage_business():
     db_close(conn)
     return render_template('auth/manage_business.html', biz=biz)
 
+@app.route('/platform')
+@superadmin_required
+def platform():
+    conn = get_db()
+    businesses = query(conn, '''SELECT b.*, (SELECT COUNT(*) FROM products p WHERE p.business_id = b.id) as product_count,
+                                       (SELECT COUNT(*) FROM users u WHERE u.business_id = b.id) as user_count
+                                FROM businesses b ORDER BY b.created_at DESC''').fetchall()
+    db_close(conn)
+    return render_template('platform.html', businesses=businesses)
+
+@app.route('/platform/<int:id>/approve', methods=['POST'])
+@superadmin_required
+def platform_approve(id):
+    conn = get_db()
+    try:
+        query(conn, "UPDATE businesses SET status = 'active' WHERE id = ?", (id,))
+        db_commit(conn)
+        log_audit(conn, 'approve', 'businesses', id, f'Approved business #{id}')
+        flash('Business approved', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('platform'))
+
+@app.route('/platform/<int:id>/suspend', methods=['POST'])
+@superadmin_required
+def platform_suspend(id):
+    conn = get_db()
+    try:
+        query(conn, "UPDATE businesses SET status = 'suspended' WHERE id = ?", (id,))
+        db_commit(conn)
+        log_audit(conn, 'suspend', 'businesses', id, f'Suspended business #{id}')
+        flash('Business suspended', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('platform'))
+
+@app.route('/platform/<int:id>/reject', methods=['POST'])
+@superadmin_required
+def platform_reject(id):
+    conn = get_db()
+    try:
+        query(conn, "UPDATE businesses SET status = 'rejected' WHERE id = ?", (id,))
+        query(conn, "UPDATE users SET role = 'staff' WHERE business_id = ? AND role = 'admin'", (id,))
+        db_commit(conn)
+        log_audit(conn, 'reject', 'businesses', id, f'Rejected business #{id}')
+        flash('Business rejected', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('platform'))
+
+@app.route('/platform/<int:id>/plan', methods=['POST'])
+@superadmin_required
+def platform_set_plan(id):
+    plan = sanitize_input(request.form.get('plan', 'free'))
+    if plan not in ('free', 'pro'):
+        plan = 'free'
+    paid_until_raw = sanitize_input(request.form.get('paid_until', ''))
+    conn = get_db()
+    try:
+        if paid_until_raw:
+            paid_until = paid_until_raw.strip()
+        else:
+            paid_until = None
+        query(conn, 'UPDATE businesses SET plan = ?, paid_until = ? WHERE id = ?', (plan, paid_until, id))
+        db_commit(conn)
+        log_audit(conn, 'plan', 'businesses', id, f'Set business #{id} plan: {plan}, paid until {paid_until or "never"}')
+        flash('Plan updated', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('platform'))
+
+@app.route('/billing')
+@login_required
+def billing():
+    conn = get_db()
+    bid = get_business_id()
+    biz = query(conn, 'SELECT * FROM businesses WHERE id = ?', (bid,)).fetchone()
+    if not biz:
+        db_close(conn)
+        return redirect(url_for('dashboard'))
+    plan = get_effective_plan()
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS['free'])
+    usage = {}
+    for kind in ('products', 'users', 'customers'):
+        usage[kind] = query(conn, f'SELECT COUNT(*) as c FROM {kind} WHERE business_id = ?', (bid,)).fetchone()['c']
+    db_close(conn)
+    return render_template('billing.html', biz=biz, plan=plan, limits=limits, usage=usage)
+
+@app.route('/billing/request-upgrade', methods=['POST'])
+@login_required
+def request_upgrade():
+    conn = get_db()
+    bid = get_business_id()
+    try:
+        query(conn, 'UPDATE businesses SET upgrade_requested = 1 WHERE id = ?', (bid,))
+        db_commit(conn)
+        log_audit(conn, 'upgrade', 'businesses', bid, 'Requested pro upgrade')
+        flash('Upgrade request sent. You will be contacted soon.', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('billing'))
+
 @app.route('/admin/users')
 @admin_required
 def manage_users():
@@ -1301,6 +1518,10 @@ def add_user():
         conn = get_db()
         bid = get_business_id()
         try:
+            if not check_limit(conn, 'users'):
+                flash(f'User limit reached on your {get_effective_plan().capitalize()} plan. Please upgrade.', 'warning')
+                db_close(conn)
+                return redirect(url_for('manage_users'))
             existing = query(conn, 'SELECT id FROM users WHERE business_id = ? AND username = ?', (bid, username)).fetchone()
             if existing:
                 flash('Username already exists', 'danger')

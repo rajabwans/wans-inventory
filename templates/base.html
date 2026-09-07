@@ -25,6 +25,7 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('sales') }}"><i class="bi bi-cart"></i> Sales</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}"><i class="bi bi-people"></i> Customers</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('expenses') }}"><i class="bi bi-receipt"></i> Expenses</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('billing') }}"><i class="bi bi-credit-card"></i> Billing</a></li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
                         <ul class="dropdown-menu">
@@ -34,6 +35,18 @@
                         </ul>
                     </li>
                     {% if session.role == 'admin' %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i> Admin</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('manage_business') }}"><i class="bi bi-building-gear"></i> Business Settings</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('manage_users') }}"><i class="bi bi-people-fill"></i> Users</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('stock_adjustments') }}"><i class="bi bi-arrow-left-right"></i> Stock Adjustments</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('audit_log') }}"><i class="bi bi-journal-text"></i> Audit Log</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    {% if session.role == 'superadmin' %}
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('platform') }}"><i class="bi bi-globe2"></i> All Businesses</a></li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i> Admin</a>
                         <ul class="dropdown-menu">

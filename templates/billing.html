@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Billing & Plan{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-credit-card"></i> Billing & Plan</h4>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card shadow h-100 {% if plan=='pro' %}border-primary{% endif %}">
+            <div class="card-body text-center">
+                <i class="bi {% if plan=='pro' %}bi-stars{% else %}bi-box{% endif %} display-4 text-primary"></i>
+                <h3 class="fw-bold mt-2 text-capitalize">{{ plan }} plan</h3>
+                <p class="text-muted small mb-1">{{ biz['name'] }}</p>
+                {% if plan == 'pro' %}
+                    {% if biz['paid_until'] %}
+                        <span class="badge bg-success">Paid until {{ (biz['paid_until'] or '')[:10] }}</span>
+                    {% else %}
+                        <span class="badge bg-primary">Lifetime</span>
+                    {% endif %}
+                {% else %}
+                    <span class="badge bg-warning text-dark">Free tier</span>
+                {% endif %}
+                <hr>
+                <form method="POST" action="{{ url_for('request_upgrade') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    {% if biz['upgrade_requested'] %}
+                        <button class="btn btn-outline-primary w-100" disabled><i class="bi bi-hourglass-split"></i> Upgrade requested</button>
+                    {% elif plan == 'pro' %}
+                        <button class="btn btn-outline-secondary w-100" disabled>You're on Pro</button>
+                    {% else %}
+                        <button class="btn btn-primary w-100"><i class="bi bi-stars"></i> Request upgrade to Pro</button>
+                    {% endif %}
+                </form>
+                <div class="form-text small mt-2">We'll contact you with the monthly price.</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header fw-bold"><i class="bi bi-pie-chart"></i> Usage</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Resource</th><th>Used</th><th>Limit</th><th style="width:40%">Progress</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for kind in ['products','users','customers'] %}
+                        {% set cap = limits[kind] %}
+                        {% if cap %}
+                            {% set pct = (usage[kind] / cap * 100)|round|int %}
+                        {% else %}
+                            {% set pct = 0 %}
+                        {% endif %}
+                        <tr>
+                            <td class="text-capitalize">{{ kind }}</td>
+                            <td>{{ usage[kind] }}</td>
+                            <td>{{ cap if cap else 'Unlimited' }}</td>
+                            <td>
+                                {% if cap %}
+                                <div class="progress" style="height:8px;">
+                                    <div class="progress-bar {% if pct >= 90 %}bg-danger{% elif pct >= 70 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ pct if pct <= 100 else 100 }}%"></div>
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">No limit</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
