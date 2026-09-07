@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<div class="row justify-content-center" style="min-height:70vh; background: linear-gradient(135deg, #212529 0%, #343a40 100%); border-radius: 1rem; padding: 4rem 2rem; margin-top: 2rem;">
+    <div class="col-md-8 text-center text-white">
+        <i class="bi bi-box-seam display-1 text-warning"></i>
+        <h1 class="display-5 fw-bold mt-3">Wans Plan</h1>
+        <p class="lead mt-2">The inventory system for small businesses.<br>Track products, sales, customers, expenses and profits — all in one place.</p>
+        <div class="mt-4">
+            <a href="{{ url_for('signup') }}" class="btn btn-warning btn-lg me-2"><i class="bi bi-rocket-takeoff"></i> Start Free</a>
+            <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-lg"><i class="bi bi-box-arrow-in-right"></i> Login</a>
+        </div>
+        <div class="row mt-5 g-3">
+            <div class="col-3"><i class="bi bi-box-seam fs-3 text-warning"></i><p class="small mb-0 mt-1">Inventory</p></div>
+            <div class="col-3"><i class="bi bi-cart fs-3 text-warning"></i><p class="small mb-0 mt-1">Sales</p></div>
+            <div class="col-3"><i class="bi bi-people fs-3 text-warning"></i><p class="small mb-0 mt-1">Customers</p></div>
+            <div class="col-3"><i class="bi bi-graph-up fs-3 text-warning"></i><p class="small mb-0 mt-1">Reports</p></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

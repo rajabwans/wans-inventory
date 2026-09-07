@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Business Settings{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-building-gear"></i> Business Settings</h4>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Business name</label>
+                        <input type="text" name="name" class="form-control" value="{{ biz['name'] }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Currency</label>
+                        <select name="currency" class="form-select" required>
+                            {% for code in ['UGX','KES','TZS','USD','EUR','GBP','NGN','ZAR','GHS','RWF','XOF'] %}
+                            <option value="{{ code }}" {% if biz['currency'] == code %}selected{% endif %}>{{ code }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Logo URL</label>
+                        <input type="text" name="logo" class="form-control" value="{{ biz['logo'] or '' }}" placeholder="https://...">
+                        <div class="form-text">Optional image URL shown in the top bar</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">About</label>
+                        <textarea name="about" class="form-control" rows="3">{{ biz['about'] or '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Slug</label>
+                        <input type="text" class="form-control" value="{{ biz['slug'] }}" disabled>
+                        <div class="form-text">Used at login. Cannot be changed.</div>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100"><i class="bi bi-check-circle"></i> Save settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

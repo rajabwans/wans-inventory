@@ -42,7 +42,10 @@ def rate_limited(e):
 
 @app.context_processor
 def inject_globals():
-    return dict(COMPANY_NAME=COMPANY_NAME, CURRENCY=CURRENCY)
+    biz = session.get('biz', {})
+    return dict(COMPANY_NAME=biz.get('name') or COMPANY_NAME,
+                CURRENCY=biz.get('currency') or CURRENCY,
+                TENANT_SLUG=biz.get('slug') or '')
 
 if IS_PG:
     import psycopg2
@@ -78,11 +81,20 @@ def db_close(conn):
     conn.close()
 
 SCHEMA_SQLITE = '''
+    CREATE TABLE IF NOT EXISTS businesses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
+        currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
+        plan TEXT DEFAULT 'free', is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
+        business_id INTEGER NOT NULL DEFAULT 1,
+        username TEXT NOT NULL, password_hash TEXT NOT NULL,
         full_name TEXT, role TEXT DEFAULT 'staff',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(business_id, username)
     );
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,25 +142,35 @@ SCHEMA_SQLITE = '''
 '''
 
 SCHEMA_PG = '''
+    CREATE TABLE IF NOT EXISTS businesses (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
+        currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
+        plan TEXT DEFAULT 'free', is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL, full_name TEXT,
-        role TEXT DEFAULT 'staff', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        username TEXT NOT NULL, password_hash TEXT NOT NULL,
+        full_name TEXT, role TEXT DEFAULT 'staff',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(business_id, username)
     );
     CREATE TABLE IF NOT EXISTS products (
-        id SERIAL PRIMARY KEY, title TEXT NOT NULL,
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        title TEXT NOT NULL,
         author TEXT, isbn TEXT, publisher TEXT, category TEXT,
         quantity INTEGER DEFAULT 0, buying_price REAL DEFAULT 0, selling_price REAL DEFAULT 0, notes TEXT,
         version INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS customers (
-        id SERIAL PRIMARY KEY, name TEXT NOT NULL,
-        phone TEXT, email TEXT, address TEXT,
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL, phone TEXT, email TEXT, address TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS sales (
-        id SERIAL PRIMARY KEY,
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
         product_id INTEGER NOT NULL REFERENCES products(id),
         customer_id INTEGER REFERENCES customers(id),
         customer_name TEXT,
@@ -157,21 +179,23 @@ SCHEMA_PG = '''
         sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS expenses (
-        id SERIAL PRIMARY KEY, description TEXT NOT NULL,
-        amount REAL NOT NULL, category TEXT, user_id INTEGER,
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        description TEXT NOT NULL, amount REAL NOT NULL, category TEXT,
+        user_id INTEGER REFERENCES users(id),
         expense_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS stock_adjustments (
-        id SERIAL PRIMARY KEY,
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
         product_id INTEGER NOT NULL REFERENCES products(id),
         adjustment_type TEXT NOT NULL, quantity INTEGER NOT NULL,
-        reason TEXT, user_id INTEGER,
+        reason TEXT, user_id INTEGER REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS audit_log (
-        id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT,
-        action TEXT NOT NULL, table_name TEXT NOT NULL, record_id INTEGER,
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        user_id INTEGER, username TEXT, action TEXT NOT NULL,
+        table_name TEXT NOT NULL, record_id INTEGER,
         details TEXT, ip_address TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 '''
@@ -180,12 +204,25 @@ MIGRATION_SQLITE = [
     "ALTER TABLE products ADD COLUMN version INTEGER DEFAULT 1",
     "ALTER TABLE sales ADD COLUMN customer_id INTEGER",
     "ALTER TABLE expenses ADD COLUMN user_id INTEGER",
+    "ALTER TABLE products ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE customers ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE sales ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE expenses ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE stock_adjustments ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE audit_log ADD COLUMN business_id INTEGER DEFAULT 1",
 ]
 
 MIGRATION_PG = [
     "ALTER TABLE products ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1",
     "ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_id INTEGER",
     "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER",
+    "ALTER TABLE products ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE customers ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE sales ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS business_id INTEGER NOT NULL DEFAULT 1",
 ]
 
 def init_db():
@@ -213,15 +250,29 @@ def init_db():
         print(f'[DB INIT ERROR] {e}', file=sys.stderr)
     db_close(conn)
 
+def create_default_business():
+    conn = get_db()
+    try:
+        existing = query(conn, "SELECT id FROM businesses WHERE slug = 'wans'").fetchone()
+        if not existing:
+            query(conn, "INSERT INTO businesses (name, slug, currency, about, plan) VALUES (?,?,?,?,?)",
+                  ('WANS COLLECTION', 'wans', 'UGX',
+                   'WANS COLLECTION official inventory system', 'pro'))
+            db_commit(conn)
+            print('[INFO] Default business created: WANS COLLECTION (slug: wans)', file=sys.stderr)
+    except Exception as e:
+        print(f'[BUSINESS INIT ERROR] {e}', file=sys.stderr)
+    db_close(conn)
+
 def create_default_admin():
     conn = get_db()
     try:
-        existing = query(conn, "SELECT id FROM users WHERE username = 'admin'").fetchone()
+        existing = query(conn, "SELECT id FROM users WHERE username = 'admin' AND business_id = 1").fetchone()
         if not existing:
             pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
             pw_hash = generate_password_hash(pw)
-            query(conn, "INSERT INTO users (username, password_hash, full_name, role) VALUES (?,?,?,?)",
-                  ('admin', pw_hash, 'Administrator', 'admin'))
+            query(conn, "INSERT INTO users (business_id, username, password_hash, full_name, role) VALUES (?,?,?,?,?)",
+                  (1, 'admin', pw_hash, 'Administrator', 'admin'))
             db_commit(conn)
             print(f'[INFO] Default admin created. Username: admin, Password: {pw}', file=sys.stderr)
     except Exception as e:
@@ -229,6 +280,7 @@ def create_default_admin():
     db_close(conn)
 
 init_db()
+create_default_business()
 create_default_admin()
 
 def login_required(f):
@@ -260,14 +312,17 @@ def get_current_user():
         'full_name': session.get('full_name', ''),
     }
 
-def log_audit(conn, action, table_name, record_id=None, details=None):
+def get_business_id():
+    return session.get('biz', {}).get('id') or session.get('business_id') or 1
+
+def log_audit(conn, action, table_name, record_id=None, details=None, business_id=None):
     try:
         ip = request.remote_addr or 'unknown'
         user_id = session.get('user_id')
         username = session.get('username', 'system')
-        query(conn, '''INSERT INTO audit_log (user_id, username, action, table_name, record_id, details, ip_address)
-                        VALUES (?,?,?,?,?,?,?)''',
-              (user_id, username, action, table_name, record_id, details, ip))
+        query(conn, '''INSERT INTO audit_log (business_id, user_id, username, action, table_name, record_id, details, ip_address)
+                        VALUES (?,?,?,?,?,?,?,?)''',
+              (business_id or get_business_id(), user_id, username, action, table_name, record_id, details, ip))
         db_commit(conn)
     except Exception:
         pass
@@ -306,17 +361,82 @@ def export_csv(filename, headers, rows):
     return send_file(mem, mimetype='text/csv',
                      download_name=filename, as_attachment=True)
 
+@app.route('/')
+def landing():
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+    conn = get_db()
+    bid = get_business_id()
+    prods = query(conn, 'SELECT COUNT(*) as c FROM products WHERE business_id = ?', (bid,)).fetchone()
+    db_close(conn)
+    return render_template('landing.html', stats=prods)
+
+@app.route('/signup', methods=['GET', 'POST'])
+@limiter.limit("10 per hour")
+def signup():
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        business_name = sanitize_input(request.form.get('business_name', ''))
+        slug = sanitize_input(request.form.get('slug', '').strip().lower())
+        currency = sanitize_input(request.form.get('currency', 'UGX'))
+        username = sanitize_input(request.form.get('username', ''))
+        full_name = sanitize_input(request.form.get('full_name', ''))
+        password = request.form.get('password', '')
+        if not business_name or not slug or not username or not password:
+            flash('Business name, slug, username and password are required', 'danger')
+            return render_template('signup.html')
+        if len(password) < 6:
+            flash('Password must be at least 6 characters', 'danger')
+            return render_template('signup.html')
+        slug = re.sub(r'[^a-z0-9-]', '-', slug).strip('-')[:40]
+        if not slug:
+            flash('Invalid business slug', 'danger')
+            return render_template('signup.html')
+        conn = get_db()
+        try:
+            existing = query(conn, 'SELECT id FROM businesses WHERE slug = ?', (slug,)).fetchone()
+            if existing:
+                flash('That business slug is already taken', 'danger')
+                db_close(conn)
+                return render_template('signup.html')
+            if IS_PG:
+                cur = query(conn, 'INSERT INTO businesses (name, slug, currency, about) VALUES (?,?,?,?) RETURNING id',
+                            (business_name, slug, currency, ''))
+                business_id = cur.fetchone()['id']
+            else:
+                cur = query(conn, 'INSERT INTO businesses (name, slug, currency, about) VALUES (?,?,?,?)',
+                            (business_name, slug, currency, ''))
+                business_id = cur.lastrowid
+            pw_hash = generate_password_hash(password)
+            query(conn, 'INSERT INTO users (business_id, username, password_hash, full_name, role) VALUES (?,?,?,?,?)',
+                  (business_id, username, pw_hash, full_name or username, 'admin'))
+            db_commit(conn)
+            log_audit(conn, 'signup', 'businesses', business_id, f'Business registered: {business_name}', business_id)
+            flash('Business registered! You can now log in.', 'success')
+            db_close(conn)
+            return redirect(url_for('login', slug=slug))
+        except Exception as e:
+            flash(f'Error registering business: {e}', 'danger')
+            db_close(conn)
+            return render_template('signup.html')
+    return render_template('signup.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
 def login():
+    slug = sanitize_input(request.args.get('slug', request.form.get('slug', '')))
     if request.method == 'POST':
         username = sanitize_input(request.form.get('username', ''))
         password = request.form.get('password', '')
-        if not username or not password:
-            flash('Username and password required', 'danger')
-            return render_template('login.html')
+        if not username or not password or not slug:
+            flash('Username, business slug and password required', 'danger')
+            return render_template('login.html', slug=slug)
         conn = get_db()
-        user = query(conn, 'SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        user = query(conn, '''SELECT u.*, b.name as business_name, b.currency, b.slug, b.logo
+                              FROM users u JOIN businesses b ON u.business_id = b.id
+                              WHERE u.username = ? AND b.slug = ?''',
+                     (username, slug)).fetchone()
         db_close(conn)
         if user and check_password_hash(user['password_hash'], password):
             session.clear()
@@ -324,53 +444,58 @@ def login():
             session['username'] = user['username']
             session['role'] = user['role']
             session['full_name'] = user['full_name'] or user['username']
+            session['biz'] = {'id': user['business_id'], 'name': user['business_name'],
+                              'currency': user['currency'], 'slug': user['slug'], 'logo': user['logo']}
             session.permanent = True
             app.permanent_session_lifetime = timedelta(hours=12)
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password', 'danger')
-    return render_template('login.html')
+        flash('Invalid username, slug or password', 'danger')
+    return render_template('login.html', slug=slug)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/')
+@app.route('/dashboard')
 @login_required
 def dashboard():
     conn = get_db()
-    total_products = query(conn, 'SELECT COUNT(*) as c FROM products').fetchone()['c']
-    total_stock = query(conn, 'SELECT COALESCE(SUM(quantity),0) as s FROM products').fetchone()['s']
-    total_invested = query(conn, 'SELECT COALESCE(SUM(buying_price * quantity),0) as t FROM products').fetchone()['t']
-    total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales').fetchone()['t']
-    total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales').fetchone()['t']
-    total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products').fetchone()['t']
-    total_customers = query(conn, 'SELECT COUNT(*) as c FROM customers').fetchone()['c']
+    bid = get_business_id()
+    total_products = query(conn, 'SELECT COUNT(*) as c FROM products WHERE business_id = ?', (bid,)).fetchone()['c']
+    total_stock = query(conn, 'SELECT COALESCE(SUM(quantity),0) as s FROM products WHERE business_id = ?', (bid,)).fetchone()['s']
+    total_invested = query(conn, 'SELECT COALESCE(SUM(buying_price * quantity),0) as t FROM products WHERE business_id = ?', (bid,)).fetchone()['t']
+    total_sales_amount = query(conn, 'SELECT COALESCE(SUM(total_amount),0) as t FROM sales WHERE business_id = ?', (bid,)).fetchone()['t']
+    total_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales WHERE business_id = ?', (bid,)).fetchone()['t']
+    total_possible_profit = query(conn, 'SELECT COALESCE(SUM((selling_price - buying_price) * quantity),0) as t FROM products WHERE business_id = ?', (bid,)).fetchone()['t']
+    total_customers = query(conn, 'SELECT COUNT(*) as c FROM customers WHERE business_id = ?', (bid,)).fetchone()['c']
     first = date.today().replace(day=1)
     next_month = first.replace(month=first.month % 12 + 1, year=first.year + (first.month // 12))
-    monthly_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales WHERE sale_date >= ? AND sale_date < ?',
-                           (first.isoformat(), next_month.isoformat())).fetchone()['t']
-    monthly_expenses = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date >= ? AND expense_date < ?',
-                              (first.isoformat(), next_month.isoformat())).fetchone()['t']
-    low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 ORDER BY quantity LIMIT 10').fetchall()
+    monthly_profit = query(conn, 'SELECT COALESCE(SUM(profit),0) as t FROM sales WHERE sale_date >= ? AND sale_date < ? AND business_id = ?',
+                           (first.isoformat(), next_month.isoformat(), bid)).fetchone()['t']
+    monthly_expenses = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date >= ? AND expense_date < ? AND business_id = ?',
+                              (first.isoformat(), next_month.isoformat(), bid)).fetchone()['t']
+    low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 AND business_id = ? ORDER BY quantity LIMIT 10', (bid,)).fetchall()
     recent_sales = query(conn, '''
         SELECT s.*, p.title, COALESCE(c.name, s.customer_name, 'Walk-in') as customer_display
         FROM sales s JOIN products p ON s.product_id = p.id
         LEFT JOIN customers c ON s.customer_id = c.id
+        WHERE s.business_id = ? AND p.business_id = ?
         ORDER BY s.sale_date DESC LIMIT 10
-    ''').fetchall()
-    recent_sales_count = query(conn, 'SELECT COUNT(*) as c FROM sales').fetchone()['c']
+    ''', (bid, bid)).fetchall()
+    recent_sales_count = query(conn, 'SELECT COUNT(*) as c FROM sales WHERE business_id = ?', (bid,)).fetchone()['c']
     category_breakdown = query(conn, '''
         SELECT COALESCE(category,'Uncategorized') as category,
                COUNT(*) as count, COALESCE(SUM(quantity),0) as stock,
                COALESCE(SUM(buying_price * quantity),0) as value
-        FROM products GROUP BY category ORDER BY value DESC
-    ''').fetchall()
+        FROM products WHERE business_id = ? GROUP BY category ORDER BY value DESC
+    ''', (bid,)).fetchall()
     top_products = query(conn, '''
         SELECT p.title, SUM(s.quantity_sold) as total_sold, COALESCE(SUM(s.total_amount),0) as revenue
         FROM sales s JOIN products p ON s.product_id = p.id
+        WHERE s.business_id = ? AND p.business_id = ?
         GROUP BY p.id ORDER BY revenue DESC LIMIT 5
-    ''').fetchall()
+    ''', (bid, bid)).fetchall()
     db_close(conn)
     return render_template('dashboard.html', total_products=total_products, total_stock=total_stock,
                            total_invested=total_invested, total_sales_amount=total_sales_amount,
@@ -385,8 +510,10 @@ def dashboard():
 def products():
     page = request.args.get('page', 1, type=int)
     conn = get_db()
+    bid = get_business_id()
     rows, total, total_pages = paginate_query(conn,
-        'SELECT *, (selling_price - buying_price) as profit_margin FROM products ORDER BY created_at DESC', [], page)
+        'SELECT *, (selling_price - buying_price) as profit_margin FROM products WHERE business_id = ? ORDER BY created_at DESC',
+        [bid], page)
     db_close(conn)
     return render_template('products.html', products=rows, page=page, total_pages=total_pages, total=total)
 
@@ -411,9 +538,10 @@ def add_product():
             return redirect(url_for('add_product'))
         notes = sanitize_input(request.form.get('notes', ''))
         conn = get_db()
+        bid = get_business_id()
         try:
-            query(conn, 'INSERT INTO products (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes) VALUES (?,?,?,?,?,?,?,?,?)',
-                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes))
+            query(conn, 'INSERT INTO products (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                  (bid, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes))
             db_commit(conn)
             log_audit(conn, 'create', 'products', None, f'Added: {title}')
             flash('Product added successfully', 'success')
@@ -427,7 +555,8 @@ def add_product():
 @login_required
 def edit_product(id):
     conn = get_db()
-    product = query(conn, 'SELECT * FROM products WHERE id = ?', (id,)).fetchone()
+    bid = get_business_id()
+    product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
     if not product:
         flash('Product not found', 'danger')
         db_close(conn)
@@ -456,8 +585,8 @@ def edit_product(id):
             result = query(conn, '''UPDATE products SET title=?, author=?, isbn=?, publisher=?, category=?,
                             quantity=?, buying_price=?, selling_price=?, notes=?,
                             version=version+1, updated_at=CURRENT_TIMESTAMP
-                            WHERE id=? AND version=?''',
-                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, id, old_version))
+                            WHERE id=? AND version=? AND business_id=?''',
+                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, id, old_version, bid))
             db_commit(conn)
             if IS_PG:
                 if result.rowcount == 0:
@@ -477,11 +606,12 @@ def edit_product(id):
 @login_required
 def delete_product(id):
     conn = get_db()
+    bid = get_business_id()
     try:
-        product = query(conn, 'SELECT title FROM products WHERE id = ?', (id,)).fetchone()
-        query(conn, 'DELETE FROM sales WHERE product_id = ?', (id,))
-        query(conn, 'DELETE FROM stock_adjustments WHERE product_id = ?', (id,))
-        query(conn, 'DELETE FROM products WHERE id = ?', (id,))
+        product = query(conn, 'SELECT title FROM products WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
+        query(conn, 'DELETE FROM sales WHERE product_id = ? AND business_id = ?', (id, bid))
+        query(conn, 'DELETE FROM stock_adjustments WHERE product_id = ? AND business_id = ?', (id, bid))
+        query(conn, 'DELETE FROM products WHERE id = ? AND business_id = ?', (id, bid))
         db_commit(conn)
         log_audit(conn, 'delete', 'products', id, f'Deleted: {product["title"] if product else id}')
         flash('Product deleted', 'success')
@@ -494,8 +624,9 @@ def delete_product(id):
 @login_required
 def adjust_stock(id):
     conn = get_db()
+    bid = get_business_id()
     try:
-        product = query(conn, 'SELECT * FROM products WHERE id = ?', (id,)).fetchone()
+        product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
         if not product:
             flash('Product not found', 'danger')
             db_close(conn)
@@ -528,9 +659,9 @@ def adjust_stock(id):
             new_qty = product['quantity'] + quantity
         else:
             new_qty = product['quantity'] + quantity
-        query(conn, 'INSERT INTO stock_adjustments (product_id, adjustment_type, quantity, reason, user_id) VALUES (?,?,?,?,?)',
-              (id, adj_type, quantity, reason, session.get('user_id')))
-        query(conn, 'UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (new_qty, id))
+        query(conn, 'INSERT INTO stock_adjustments (business_id, product_id, adjustment_type, quantity, reason, user_id) VALUES (?,?,?,?,?,?)',
+              (bid, id, adj_type, quantity, reason, session.get('user_id')))
+        query(conn, 'UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?', (new_qty, id, bid))
         db_commit(conn)
         log_audit(conn, 'adjust', 'products', id, f'{adj_type}: {quantity} units of {product["title"]} (reason: {reason})')
         flash(f'Stock adjusted: {adj_type} {quantity} units', 'success')
@@ -544,11 +675,13 @@ def adjust_stock(id):
 def sales():
     page = request.args.get('page', 1, type=int)
     conn = get_db()
+    bid = get_business_id()
     sql = '''SELECT s.*, p.title, COALESCE(c.name, s.customer_name, 'Walk-in') as customer_display
              FROM sales s JOIN products p ON s.product_id = p.id
              LEFT JOIN customers c ON s.customer_id = c.id
+             WHERE s.business_id = ? AND p.business_id = ?
              ORDER BY s.sale_date DESC'''
-    rows, total, total_pages = paginate_query(conn, sql, [], page)
+    rows, total, total_pages = paginate_query(conn, sql, [bid, bid], page)
     db_close(conn)
     return render_template('sales.html', sales=rows, page=page, total_pages=total_pages, total=total)
 
@@ -556,6 +689,7 @@ def sales():
 @login_required
 def add_sale():
     conn = get_db()
+    bid = get_business_id()
     if request.method == 'POST':
         try:
             product_id = int(request.form['product_id'])
@@ -568,7 +702,7 @@ def add_sale():
         customer_id = request.form.get('customer_id')
         customer_id = int(customer_id) if customer_id else None
         customer_name = sanitize_input(request.form.get('customer_name', ''))
-        product = query(conn, 'SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
+        product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (product_id, bid)).fetchone()
         if not product:
             flash('Product not found', 'danger')
             db_close(conn)
@@ -584,11 +718,11 @@ def add_sale():
         total_amount = unit_price * quantity_sold
         profit = (unit_price - product['buying_price']) * quantity_sold
         try:
-            query(conn, '''INSERT INTO sales (product_id, customer_id, customer_name, quantity_sold, unit_price, total_amount, profit)
-                           VALUES (?,?,?,?,?,?,?)''',
-                  (product_id, customer_id, customer_name, quantity_sold, unit_price, total_amount, profit))
-            query(conn, 'UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                  (quantity_sold, product_id))
+            query(conn, '''INSERT INTO sales (business_id, product_id, customer_id, customer_name, quantity_sold, unit_price, total_amount, profit)
+                           VALUES (?,?,?,?,?,?,?,?)''',
+                  (bid, product_id, customer_id, customer_name, quantity_sold, unit_price, total_amount, profit))
+            query(conn, 'UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?',
+                  (quantity_sold, product_id, bid))
             db_commit(conn)
             log_audit(conn, 'create', 'sales', None, f'Sale: {quantity_sold}x {product["title"]} for {CURRENCY} {total_amount:,.0f}')
             flash('Sale recorded successfully', 'success')
@@ -596,8 +730,8 @@ def add_sale():
             flash(f'Error recording sale: {e}', 'danger')
         db_close(conn)
         return redirect(url_for('sales'))
-    products = query(conn, 'SELECT * FROM products WHERE quantity > 0 ORDER BY title').fetchall()
-    customers = query(conn, 'SELECT * FROM customers ORDER BY name').fetchall()
+    products = query(conn, 'SELECT * FROM products WHERE quantity > 0 AND business_id = ? ORDER BY title', (bid,)).fetchall()
+    customers = query(conn, 'SELECT * FROM customers WHERE business_id = ? ORDER BY name', (bid,)).fetchall()
     db_close(conn)
     return render_template('add_sale.html', products=products, customers=customers)
 
@@ -605,12 +739,13 @@ def add_sale():
 @login_required
 def delete_sale(id):
     conn = get_db()
+    bid = get_business_id()
     try:
-        sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (id,)).fetchone()
+        sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
         if sale:
-            query(conn, 'UPDATE products SET quantity = quantity + ? WHERE id = ?',
-                  (sale['quantity_sold'], sale['product_id']))
-            query(conn, 'DELETE FROM sales WHERE id = ?', (id,))
+            query(conn, 'UPDATE products SET quantity = quantity + ? WHERE id = ? AND business_id = ?',
+                  (sale['quantity_sold'], sale['product_id'], bid))
+            query(conn, 'DELETE FROM sales WHERE id = ? AND business_id = ?', (id, bid))
             db_commit(conn)
             log_audit(conn, 'delete', 'sales', id, f'Deleted sale #{id}')
         flash('Sale deleted', 'success')
@@ -624,9 +759,10 @@ def delete_sale(id):
 def expenses():
     page = request.args.get('page', 1, type=int)
     conn = get_db()
+    bid = get_business_id()
     rows, total, total_pages = paginate_query(conn,
-        'SELECT * FROM expenses ORDER BY expense_date DESC', [], page)
-    total_all = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses').fetchone()['t']
+        'SELECT * FROM expenses WHERE business_id = ? ORDER BY expense_date DESC', [bid], page)
+    total_all = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE business_id = ?', (bid,)).fetchone()['t']
     db_close(conn)
     return render_template('expenses.html', expenses=rows, total=total_all,
                            page=page, total_pages=total_pages, total_count=total)
@@ -649,9 +785,10 @@ def add_expense():
             return redirect(url_for('add_expense'))
         category = sanitize_input(request.form.get('category', ''))
         conn = get_db()
+        bid = get_business_id()
         try:
-            query(conn, 'INSERT INTO expenses (description, amount, category, user_id) VALUES (?,?,?,?)',
-                  (description, amount, category, session.get('user_id')))
+            query(conn, 'INSERT INTO expenses (business_id, description, amount, category, user_id) VALUES (?,?,?,?,?)',
+                  (bid, description, amount, category, session.get('user_id')))
             db_commit(conn)
             log_audit(conn, 'create', 'expenses', None, f'Expense: {description} - {CURRENCY} {amount:,.0f}')
             flash('Expense added successfully', 'success')
@@ -665,8 +802,9 @@ def add_expense():
 @login_required
 def delete_expense(id):
     conn = get_db()
+    bid = get_business_id()
     try:
-        query(conn, 'DELETE FROM expenses WHERE id = ?', (id,))
+        query(conn, 'DELETE FROM expenses WHERE id = ? AND business_id = ?', (id, bid))
         db_commit(conn)
         log_audit(conn, 'delete', 'expenses', id, f'Deleted expense #{id}')
         flash('Expense deleted', 'success')
@@ -680,8 +818,9 @@ def delete_expense(id):
 def customers():
     page = request.args.get('page', 1, type=int)
     conn = get_db()
+    bid = get_business_id()
     rows, total, total_pages = paginate_query(conn,
-        'SELECT * FROM customers ORDER BY name', [], page)
+        'SELECT * FROM customers WHERE business_id = ? ORDER BY name', [bid], page)
     db_close(conn)
     return render_template('customers/list.html', customers=rows,
                            page=page, total_pages=total_pages, total=total)
@@ -698,9 +837,10 @@ def add_customer():
         email = sanitize_input(request.form.get('email', ''))
         address = sanitize_input(request.form.get('address', ''))
         conn = get_db()
+        bid = get_business_id()
         try:
-            query(conn, 'INSERT INTO customers (name, phone, email, address) VALUES (?,?,?,?)',
-                  (name, phone, email, address))
+            query(conn, 'INSERT INTO customers (business_id, name, phone, email, address) VALUES (?,?,?,?,?)',
+                  (bid, name, phone, email, address))
             db_commit(conn)
             log_audit(conn, 'create', 'customers', None, f'Added customer: {name}')
             flash('Customer added successfully', 'success')
@@ -714,7 +854,8 @@ def add_customer():
 @login_required
 def edit_customer(id):
     conn = get_db()
-    customer = query(conn, 'SELECT * FROM customers WHERE id = ?', (id,)).fetchone()
+    bid = get_business_id()
+    customer = query(conn, 'SELECT * FROM customers WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
     if not customer:
         flash('Customer not found', 'danger')
         db_close(conn)
@@ -729,8 +870,8 @@ def edit_customer(id):
         email = sanitize_input(request.form.get('email', ''))
         address = sanitize_input(request.form.get('address', ''))
         try:
-            query(conn, 'UPDATE customers SET name=?, phone=?, email=?, address=? WHERE id=?',
-                  (name, phone, email, address, id))
+            query(conn, 'UPDATE customers SET name=?, phone=?, email=?, address=? WHERE id=? AND business_id=?',
+                  (name, phone, email, address, id, bid))
             db_commit(conn)
             log_audit(conn, 'update', 'customers', id, f'Updated customer: {name}')
             flash('Customer updated successfully', 'success')
@@ -745,9 +886,10 @@ def edit_customer(id):
 @login_required
 def delete_customer(id):
     conn = get_db()
+    bid = get_business_id()
     try:
-        query(conn, 'UPDATE sales SET customer_id = NULL WHERE customer_id = ?', (id,))
-        query(conn, 'DELETE FROM customers WHERE id = ?', (id,))
+        query(conn, 'UPDATE sales SET customer_id = NULL WHERE customer_id = ? AND business_id = ?', (id, bid))
+        query(conn, 'DELETE FROM customers WHERE id = ? AND business_id = ?', (id, bid))
         db_commit(conn)
         log_audit(conn, 'delete', 'customers', id, f'Deleted customer #{id}')
         flash('Customer deleted', 'success')
@@ -760,7 +902,8 @@ def delete_customer(id):
 @login_required
 def customer_detail(id):
     conn = get_db()
-    customer = query(conn, 'SELECT * FROM customers WHERE id = ?', (id,)).fetchone()
+    bid = get_business_id()
+    customer = query(conn, 'SELECT * FROM customers WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
     if not customer:
         flash('Customer not found', 'danger')
         db_close(conn)
@@ -768,8 +911,8 @@ def customer_detail(id):
     sales = query(conn, '''
         SELECT s.*, p.title FROM sales s
         JOIN products p ON s.product_id = p.id
-        WHERE s.customer_id = ? ORDER BY s.sale_date DESC
-    ''', (id,)).fetchall()
+        WHERE s.customer_id = ? AND s.business_id = ? AND p.business_id = ? ORDER BY s.sale_date DESC
+    ''', (id, bid, bid)).fetchall()
     total_spent = sum(s['total_amount'] for s in sales)
     total_items = sum(s['quantity_sold'] for s in sales)
     db_close(conn)
@@ -781,11 +924,13 @@ def customer_detail(id):
 def stock_adjustments():
     page = request.args.get('page', 1, type=int)
     conn = get_db()
+    bid = get_business_id()
     sql = '''SELECT sa.*, p.title, u.username FROM stock_adjustments sa
              JOIN products p ON sa.product_id = p.id
              LEFT JOIN users u ON sa.user_id = u.id
+             WHERE sa.business_id = ? AND p.business_id = ?
              ORDER BY sa.created_at DESC'''
-    rows, total, total_pages = paginate_query(conn, sql, [], page)
+    rows, total, total_pages = paginate_query(conn, sql, [bid, bid], page)
     db_close(conn)
     return render_template('stock/history.html', adjustments=rows,
                            page=page, total_pages=total_pages, total=total)
@@ -794,15 +939,16 @@ def stock_adjustments():
 @login_required
 def invoice(sale_id):
     conn = get_db()
-    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    bid = get_business_id()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (sale_id, bid)).fetchone()
     if not sale:
         db_close(conn)
         flash('Sale not found', 'danger')
         return redirect(url_for('sales'))
-    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (sale['product_id'], bid)).fetchone()
     customer = None
     if sale['customer_id']:
-        customer = query(conn, 'SELECT * FROM customers WHERE id = ?', (sale['customer_id'],)).fetchone()
+        customer = query(conn, 'SELECT * FROM customers WHERE id = ? AND business_id = ?', (sale['customer_id'], bid)).fetchone()
     db_close(conn)
     sale_date = sale['sale_date'][:10] if isinstance(sale['sale_date'], str) else sale['sale_date'].strftime('%Y-%m-%d')
     return render_template('invoice.html', sale=sale, product=product, sale_date=sale_date, customer=customer)
@@ -812,12 +958,13 @@ def invoice(sale_id):
 def invoice_pdf(sale_id):
     from utils.pdf import generate_invoice_pdf
     conn = get_db()
-    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    bid = get_business_id()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (sale_id, bid)).fetchone()
     if not sale:
         db_close(conn)
         flash('Sale not found', 'danger')
         return redirect(url_for('sales'))
-    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (sale['product_id'], bid)).fetchone()
     db_close(conn)
     sale_dict = dict(sale)
     if sale_dict.get('customer_id') and not sale_dict.get('customer_name'):
@@ -830,15 +977,16 @@ def invoice_pdf(sale_id):
 @login_required
 def receipt(sale_id):
     conn = get_db()
-    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    bid = get_business_id()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (sale_id, bid)).fetchone()
     if not sale:
         db_close(conn)
         flash('Sale not found', 'danger')
         return redirect(url_for('sales'))
-    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (sale['product_id'], bid)).fetchone()
     customer = None
     if sale['customer_id']:
-        customer = query(conn, 'SELECT * FROM customers WHERE id = ?', (sale['customer_id'],)).fetchone()
+        customer = query(conn, 'SELECT * FROM customers WHERE id = ? AND business_id = ?', (sale['customer_id'], bid)).fetchone()
     db_close(conn)
     sale_date = sale['sale_date'][:10] if isinstance(sale['sale_date'], str) else sale['sale_date'].strftime('%Y-%m-%d')
     return render_template('receipt.html', sale=sale, product=product, sale_date=sale_date, customer=customer)
@@ -848,12 +996,13 @@ def receipt(sale_id):
 def receipt_pdf(sale_id):
     from utils.pdf import generate_receipt_pdf
     conn = get_db()
-    sale = query(conn, 'SELECT * FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    bid = get_business_id()
+    sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (sale_id, bid)).fetchone()
     if not sale:
         db_close(conn)
         flash('Sale not found', 'danger')
         return redirect(url_for('sales'))
-    product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+    product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (sale['product_id'], bid)).fetchone()
     db_close(conn)
     sale_dict = dict(sale)
     if sale_dict.get('customer_id') and not sale_dict.get('customer_name'):
@@ -866,7 +1015,8 @@ def receipt_pdf(sale_id):
 @login_required
 def stock_report():
     conn = get_db()
-    prods = query(conn, 'SELECT * FROM products ORDER BY category, title').fetchall()
+    bid = get_business_id()
+    prods = query(conn, 'SELECT * FROM products WHERE business_id = ? ORDER BY category, title', (bid,)).fetchall()
     db_close(conn)
     total_value = sum(p['buying_price'] * p['quantity'] for p in prods)
     potential_revenue = sum(p['selling_price'] * p['quantity'] for p in prods)
@@ -884,7 +1034,8 @@ def stock_report():
 def stock_report_pdf():
     from utils.pdf import generate_stock_report_pdf
     conn = get_db()
-    prods = query(conn, 'SELECT * FROM products ORDER BY category, title').fetchall()
+    bid = get_business_id()
+    prods = query(conn, 'SELECT * FROM products WHERE business_id = ? ORDER BY category, title', (bid,)).fetchall()
     db_close(conn)
     total_value = sum(p['buying_price'] * p['quantity'] for p in prods)
     potential_revenue = sum(p['selling_price'] * p['quantity'] for p in prods)
@@ -903,7 +1054,8 @@ def stock_report_pdf():
 @login_required
 def stock_report_csv():
     conn = get_db()
-    prods = query(conn, 'SELECT * FROM products ORDER BY category, title').fetchall()
+    bid = get_business_id()
+    prods = query(conn, 'SELECT * FROM products WHERE business_id = ? ORDER BY category, title', (bid,)).fetchall()
     db_close(conn)
     headers = ['Product', 'Category', 'Qty', 'Buy Price', 'Sell Price', 'Stock Value', 'Retail Value']
     rows = [[p['title'], p['category'] or '', p['quantity'],
@@ -918,12 +1070,13 @@ def sales_report():
     date_from = request.args.get('date_from', today.replace(day=1).isoformat())
     date_to = request.args.get('date_to', today.isoformat())
     conn = get_db()
+    bid = get_business_id()
     all_sales = query(conn, '''
         SELECT s.*, p.title FROM sales s
         JOIN products p ON s.product_id = p.id
-        WHERE s.sale_date >= ? AND s.sale_date <= ?
+        WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.business_id = ? AND p.business_id = ?
         ORDER BY s.sale_date DESC
-    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    ''', (date_from, date_to + ' 23:59:59', bid, bid)).fetchall()
     db_close(conn)
     total_amount = sum(s['total_amount'] for s in all_sales)
     total_profit = sum(s['profit'] for s in all_sales)
@@ -943,12 +1096,13 @@ def sales_report_pdf():
     date_from = request.args.get('date_from', today.replace(day=1).isoformat())
     date_to = request.args.get('date_to', today.isoformat())
     conn = get_db()
+    bid = get_business_id()
     all_sales = query(conn, '''
         SELECT s.*, p.title FROM sales s
         JOIN products p ON s.product_id = p.id
-        WHERE s.sale_date >= ? AND s.sale_date <= ?
+        WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.business_id = ? AND p.business_id = ?
         ORDER BY s.sale_date DESC
-    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    ''', (date_from, date_to + ' 23:59:59', bid, bid)).fetchall()
     db_close(conn)
     total_amount = sum(s['total_amount'] for s in all_sales)
     total_profit = sum(s['profit'] for s in all_sales)
@@ -967,12 +1121,13 @@ def sales_report_csv():
     date_from = request.args.get('date_from', today.replace(day=1).isoformat())
     date_to = request.args.get('date_to', today.isoformat())
     conn = get_db()
+    bid = get_business_id()
     all_sales = query(conn, '''
         SELECT s.*, p.title FROM sales s
         JOIN products p ON s.product_id = p.id
-        WHERE s.sale_date >= ? AND s.sale_date <= ?
+        WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.business_id = ? AND p.business_id = ?
         ORDER BY s.sale_date DESC
-    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    ''', (date_from, date_to + ' 23:59:59', bid, bid)).fetchall()
     db_close(conn)
     headers = ['Date', 'Product', 'Customer', 'Qty', 'Unit Price', 'Total', 'Profit']
     rows = [[(s['sale_date'][:10] if isinstance(s['sale_date'], str) else s['sale_date'].strftime('%Y-%m-%d')),
@@ -987,19 +1142,20 @@ def pnl_report():
     date_from = request.args.get('date_from', today.replace(day=1).isoformat())
     date_to = request.args.get('date_to', today.isoformat())
     conn = get_db()
+    bid = get_business_id()
     sales_data = query(conn, '''
         SELECT COALESCE(SUM(total_amount), 0) as revenue,
                COALESCE(SUM(profit), 0) as gross_profit
-        FROM sales WHERE sale_date >= ? AND sale_date <= ?
-    ''', (date_from, date_to + ' 23:59:59')).fetchone()
+        FROM sales WHERE sale_date >= ? AND sale_date <= ? AND business_id = ?
+    ''', (date_from, date_to + ' 23:59:59', bid)).fetchone()
     revenue = sales_data['revenue']
     gross_profit = sales_data['gross_profit']
     cogs = revenue - gross_profit
     expenses = query(conn, '''
         SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as amount
-        FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+        FROM expenses WHERE expense_date >= ? AND expense_date <= ? AND business_id = ?
         GROUP BY category ORDER BY amount DESC
-    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    ''', (date_from, date_to + ' 23:59:59', bid)).fetchall()
     total_expenses = sum(e['amount'] for e in expenses)
     db_close(conn)
     data = {
@@ -1018,19 +1174,20 @@ def pnl_report_pdf():
     date_from = request.args.get('date_from', today.replace(day=1).isoformat())
     date_to = request.args.get('date_to', today.isoformat())
     conn = get_db()
+    bid = get_business_id()
     sales_data = query(conn, '''
         SELECT COALESCE(SUM(total_amount), 0) as revenue,
                COALESCE(SUM(profit), 0) as gross_profit
-        FROM sales WHERE sale_date >= ? AND sale_date <= ?
-    ''', (date_from, date_to + ' 23:59:59')).fetchone()
+        FROM sales WHERE sale_date >= ? AND sale_date <= ? AND business_id = ?
+    ''', (date_from, date_to + ' 23:59:59', bid)).fetchone()
     revenue = sales_data['revenue']
     gross_profit = sales_data['gross_profit']
     cogs = revenue - gross_profit
     expenses = query(conn, '''
         SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as amount
-        FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+        FROM expenses WHERE expense_date >= ? AND expense_date <= ? AND business_id = ?
         GROUP BY category ORDER BY amount DESC
-    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    ''', (date_from, date_to + ' 23:59:59', bid)).fetchall()
     total_expenses = sum(e['amount'] for e in expenses)
     db_close(conn)
     data = {
@@ -1049,19 +1206,20 @@ def pnl_report_csv():
     date_from = request.args.get('date_from', today.replace(day=1).isoformat())
     date_to = request.args.get('date_to', today.isoformat())
     conn = get_db()
+    bid = get_business_id()
     sales_data = query(conn, '''
         SELECT COALESCE(SUM(total_amount), 0) as revenue,
                COALESCE(SUM(profit), 0) as gross_profit
-        FROM sales WHERE sale_date >= ? AND sale_date <= ?
-    ''', (date_from, date_to + ' 23:59:59')).fetchone()
+        FROM sales WHERE sale_date >= ? AND sale_date <= ? AND business_id = ?
+    ''', (date_from, date_to + ' 23:59:59', bid)).fetchone()
     revenue = sales_data['revenue']
     gross_profit = sales_data['gross_profit']
     cogs = revenue - gross_profit
     expenses = query(conn, '''
         SELECT COALESCE(category, 'Uncategorized') as category, SUM(amount) as amount
-        FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+        FROM expenses WHERE expense_date >= ? AND expense_date <= ? AND business_id = ?
         GROUP BY category ORDER BY amount DESC
-    ''', (date_from, date_to + ' 23:59:59')).fetchall()
+    ''', (date_from, date_to + ' 23:59:59', bid)).fetchall()
     total_expenses = sum(e['amount'] for e in expenses)
     db_close(conn)
     headers = ['Item', 'Amount']
@@ -1077,17 +1235,50 @@ def pnl_report_csv():
 def audit_log():
     page = request.args.get('page', 1, type=int)
     conn = get_db()
-    sql = 'SELECT * FROM audit_log ORDER BY created_at DESC'
-    rows, total, total_pages = paginate_query(conn, sql, [], page)
+    bid = get_business_id()
+    sql = 'SELECT * FROM audit_log WHERE business_id = ? ORDER BY created_at DESC'
+    rows, total, total_pages = paginate_query(conn, sql, [bid], page)
     db_close(conn)
     return render_template('audit/log.html', logs=rows,
                            page=page, total_pages=total_pages, total=total)
+
+@app.route('/admin/business', methods=['GET', 'POST'])
+@admin_required
+def manage_business():
+    conn = get_db()
+    bid = get_business_id()
+    biz = query(conn, 'SELECT * FROM businesses WHERE id = ?', (bid,)).fetchone()
+    if not biz:
+        db_close(conn)
+        flash('Business not found', 'danger')
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        name = sanitize_input(request.form.get('name', '')) or biz['name']
+        currency = sanitize_input(request.form.get('currency', '')) or biz['currency']
+        logo = sanitize_input(request.form.get('logo', '')) or ''
+        about = sanitize_input(request.form.get('about', '')) or ''
+        try:
+            query(conn, 'UPDATE businesses SET name=?, currency=?, logo=?, about=? WHERE id=?',
+                  (name, currency, logo, about, bid))
+            db_commit(conn)
+            session['biz']['name'] = name
+            session['biz']['currency'] = currency
+            session['biz']['logo'] = logo
+            log_audit(conn, 'update', 'businesses', bid, f'Updated business settings')
+            flash('Business settings updated', 'success')
+        except Exception as e:
+            flash(f'Error updating business: {e}', 'danger')
+        db_close(conn)
+        return redirect(url_for('manage_business'))
+    db_close(conn)
+    return render_template('auth/manage_business.html', biz=biz)
 
 @app.route('/admin/users')
 @admin_required
 def manage_users():
     conn = get_db()
-    users = query(conn, 'SELECT * FROM users ORDER BY created_at').fetchall()
+    bid = get_business_id()
+    users = query(conn, 'SELECT * FROM users WHERE business_id = ? ORDER BY created_at', (bid,)).fetchall()
     db_close(conn)
     return render_template('auth/manage_users.html', users=users)
 
@@ -1108,15 +1299,16 @@ def add_user():
         if role not in ('admin', 'manager', 'staff'):
             role = 'staff'
         conn = get_db()
+        bid = get_business_id()
         try:
-            existing = query(conn, 'SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+            existing = query(conn, 'SELECT id FROM users WHERE business_id = ? AND username = ?', (bid, username)).fetchone()
             if existing:
                 flash('Username already exists', 'danger')
                 db_close(conn)
                 return redirect(url_for('add_user'))
             pw_hash = generate_password_hash(password)
-            query(conn, 'INSERT INTO users (username, password_hash, full_name, role) VALUES (?,?,?,?)',
-                  (username, pw_hash, full_name, role))
+            query(conn, 'INSERT INTO users (business_id, username, password_hash, full_name, role) VALUES (?,?,?,?,?)',
+                  (bid, username, pw_hash, full_name, role))
             db_commit(conn)
             log_audit(conn, 'create', 'users', None, f'Created user: {username} (role: {role})')
             flash(f'User {username} created successfully', 'success')
@@ -1130,7 +1322,8 @@ def add_user():
 @admin_required
 def edit_user(id):
     conn = get_db()
-    user = query(conn, 'SELECT * FROM users WHERE id = ?', (id,)).fetchone()
+    bid = get_business_id()
+    user = query(conn, 'SELECT * FROM users WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
     if not user:
         flash('User not found', 'danger')
         db_close(conn)
@@ -1148,11 +1341,11 @@ def edit_user(id):
                     db_close(conn)
                     return redirect(url_for('edit_user', id=id))
                 pw_hash = generate_password_hash(password)
-                query(conn, 'UPDATE users SET full_name=?, role=?, password_hash=? WHERE id=?',
-                      (full_name, role, pw_hash, id))
+                query(conn, 'UPDATE users SET full_name=?, role=?, password_hash=? WHERE id=? AND business_id=?',
+                      (full_name, role, pw_hash, id, bid))
             else:
-                query(conn, 'UPDATE users SET full_name=?, role=? WHERE id=?',
-                      (full_name, role, id))
+                query(conn, 'UPDATE users SET full_name=?, role=? WHERE id=? AND business_id=?',
+                      (full_name, role, id, bid))
             db_commit(conn)
             log_audit(conn, 'update', 'users', id, f'Updated user: {user["username"]}')
             flash('User updated successfully', 'success')
@@ -1167,13 +1360,14 @@ def edit_user(id):
 @admin_required
 def delete_user(id):
     conn = get_db()
+    bid = get_business_id()
     try:
-        user = query(conn, 'SELECT * FROM users WHERE id = ?', (id,)).fetchone()
+        user = query(conn, 'SELECT * FROM users WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
         if user and user['username'] == 'admin':
             flash('Cannot delete the admin account', 'danger')
             db_close(conn)
             return redirect(url_for('manage_users'))
-        query(conn, 'DELETE FROM users WHERE id = ?', (id,))
+        query(conn, 'DELETE FROM users WHERE id = ? AND business_id = ?', (id, bid))
         db_commit(conn)
         log_audit(conn, 'delete', 'users', id, f'Deleted user: {user["username"] if user else id}')
         flash('User deleted', 'success')
