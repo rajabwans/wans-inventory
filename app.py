@@ -11,7 +11,24 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+class PrefixMiddleware:
+    def __init__(self, app, prefix):
+        self.app = app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        if environ['PATH_INFO'].startswith(self.prefix):
+            environ['PATH_INFO'] = environ['PATH_INFO'][len(self.prefix):] or '/'
+            environ['SCRIPT_NAME'] = environ.get('SCRIPT_NAME', '') + self.prefix
+            return self.app(environ, start_response)
+        start_response('404 Not Found', [('Content-Type', 'text/plain')])
+        return [b'404 Not Found']
+
+
 app = Flask(__name__)
+URL_PREFIX = os.environ.get('URL_PREFIX', '/wans')
+if URL_PREFIX and URL_PREFIX != '/':
+    app.wsgi_app = PrefixMiddleware(app.wsgi_app, URL_PREFIX)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
