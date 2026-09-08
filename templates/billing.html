@@ -27,14 +27,31 @@
                     <span class="badge bg-danger">Locked — reactivate to continue</span>
                 {% endif %}
                 <hr>
-                <form method="POST" action="{{ url_for('request_upgrade') }}">
+                <form method="POST" action="{{ url_for('request_upgrade') }}" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     {% if biz['upgrade_requested'] %}
+                        <div class="alert alert-warning small text-start mb-2">
+                            <i class="bi bi-hourglass-split"></i> Your request is pending review.
+                            {% if biz['upgrade_note'] %}<div class="mt-1 text-muted">Message: {{ biz['upgrade_note'][:80] }}{{ '…' if biz['upgrade_note']|length > 80 }}</div>{% endif %}
+                            {% if biz['upgrade_proof'] %}<div class="mt-1"><a href="{{ url_for('serve_upload', filename=biz['upgrade_proof']) }}" target="_blank">View proof</a></div>{% endif %}
+                        </div>
                         <button class="btn btn-outline-primary w-100" disabled><i class="bi bi-hourglass-split"></i> Upgrade requested</button>
                     {% elif plan == 'pro' %}
                         <button class="btn btn-outline-secondary w-100" disabled>You're on Pro</button>
                     {% else %}
-                        <button class="btn btn-primary w-100"><i class="bi bi-stars"></i> Request upgrade to Pro</button>
+                        <div class="text-start mb-2">
+                            <label class="form-label small fw-bold mb-1">Mobile Money transaction ID</label>
+                            <input type="text" class="form-control form-control-sm" name="transaction_ref" placeholder="e.g. TXN/2026/88392" maxlength="100" required>
+                        </div>
+                        <div class="text-start mb-2">
+                            <label class="form-label small fw-bold mb-1">Message to administrator <span class="text-muted fw-normal">(optional)</span></label>
+                            <textarea class="form-control form-control-sm" name="note" rows="2" maxlength="500" placeholder="Phone number used, amount sent, anything to confirm your payment"></textarea>
+                        </div>
+                        <div class="text-start mb-2">
+                            <label class="form-label small fw-bold mb-1">Payment proof screenshot <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="file" class="form-control form-control-sm" name="proof" accept="image/png,image/jpeg,image/webp,image/gif">
+                        </div>
+                        <button class="btn btn-primary w-100"><i class="bi bi-stars"></i> Send upgrade request</button>
                     {% endif %}
                 </form>
                 {% if plan != 'pro' %}
@@ -43,7 +60,7 @@
                     {% if PRO_PRICE %}<div class="mb-1">{{ PRO_PRICE }}</div>{% endif %}
                     <div class="mb-1">Send to: <span class="fw-bold fs-6 text-dark" style="font-size:1.1rem !important;">{{ PAYMENT_PHONE }}</span></div>
                     <div class="mb-1">Name: {{ COMPANY_NAME }}</div>
-                    <div class="text-muted">Then tap "Request upgrade" above. Your Pro plan is activated once your payment is confirmed.</div>
+                    <div class="text-muted">After sending, fill in the transaction ID (and message / proof screenshot) and tap "Send upgrade request".</div>
                 </div>
                 {% endif %}
             </div>

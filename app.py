@@ -3,7 +3,7 @@ import sqlite3
 from functools import wraps
 from datetime import date, datetime, timedelta
 from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, session, send_file, abort, g)
+                   flash, session, send_file, send_from_directory, abort, g)
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -32,6 +32,10 @@ if URL_PREFIX and URL_PREFIX != '/':
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'uploads'))
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+ALLOWED_PROOF_EXT = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
 csrf = CSRFProtect()
 csrf.init_app(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=["500 per day"])
@@ -92,7 +96,7 @@ def block_suspended():
             return redirect(url_for('login'))
         if status == 'pending' and request.endpoint not in ('logout', 'static'):
             return render_template('error.html', error='Your business is still awaiting approval.'), 403
-        allowed = ('logout', 'static', 'billing', 'request_upgrade', 'platform')
+        allowed = ('logout', 'static', 'billing', 'request_upgrade', 'platform', 'serve_upload')
         if status == 'active' and session.get('role') != 'superadmin' \
                 and get_effective_plan() == 'expired' and request.endpoint not in allowed:
             flash('Your free trial has ended. Activate Pro to continue using Wans Plan.', 'warning')
@@ -150,6 +154,7 @@ SCHEMA_SQLITE = '''
         currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
         plan TEXT DEFAULT 'free', status TEXT DEFAULT 'pending',
         paid_until TIMESTAMP, upgrade_requested INTEGER DEFAULT 0,
+        upgrade_note TEXT, upgrade_proof TEXT, upgrade_requested_at TIMESTAMP,
         trial_ends_at TIMESTAMP,
         is_active INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -223,6 +228,7 @@ SCHEMA_PG = '''
         currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
         plan TEXT DEFAULT 'free', status TEXT DEFAULT 'pending',
         paid_until TIMESTAMP, upgrade_requested BOOLEAN DEFAULT FALSE,
+        upgrade_note TEXT, upgrade_proof TEXT, upgrade_requested_at TIMESTAMP,
         trial_ends_at TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -298,6 +304,9 @@ MIGRATION_SQLITE = [
     "ALTER TABLE businesses ADD COLUMN status TEXT DEFAULT 'pending'",
     "ALTER TABLE businesses ADD COLUMN paid_until TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN upgrade_requested INTEGER DEFAULT 0",
+    "ALTER TABLE businesses ADD COLUMN upgrade_note TEXT",
+    "ALTER TABLE businesses ADD COLUMN upgrade_proof TEXT",
+    "ALTER TABLE businesses ADD COLUMN upgrade_requested_at TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN trial_ends_at TIMESTAMP",
 ]
 
@@ -315,6 +324,9 @@ MIGRATION_PG = [
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'",
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS upgrade_requested BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS upgrade_note TEXT",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS upgrade_proof TEXT",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS upgrade_requested_at TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP",
 ]
 
@@ -1604,9 +1616,31 @@ def platform_set_plan(id):
         else:
             paid_until = None
         query(conn, 'UPDATE businesses SET plan = ?, paid_until = ? WHERE id = ?', (plan, paid_until, id))
+        if plan == 'pro':
+            old = query(conn, 'SELECT upgrade_proof FROM businesses WHERE id = ?', (id,)).fetchone()
+            query(conn, '''UPDATE businesses SET upgrade_requested = 0, upgrade_note = NULL,
+                            upgrade_proof = NULL, upgrade_requested_at = NULL WHERE id = ?''', (id,))
+            _delete_proof_file(old['upgrade_proof'] if old else None)
         db_commit(conn)
         log_audit(conn, 'plan', 'businesses', id, f'Set business #{id} plan: {plan}, paid until {paid_until or "never"}')
         flash('Plan updated', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('platform'))
+
+@app.route('/platform/<int:id>/clear-upgrade', methods=['POST'])
+@superadmin_required
+def platform_clear_upgrade(id):
+    conn = get_db()
+    try:
+        old = query(conn, 'SELECT upgrade_proof FROM businesses WHERE id = ?', (id,)).fetchone()
+        query(conn, '''UPDATE businesses SET upgrade_requested = 0, upgrade_note = NULL,
+                        upgrade_proof = NULL, upgrade_requested_at = NULL WHERE id = ?''', (id,))
+        _delete_proof_file(old['upgrade_proof'] if old else None)
+        db_commit(conn)
+        log_audit(conn, 'upgrade', 'businesses', id, f'Dismissed upgrade request for business #{id}')
+        flash('Upgrade request dismissed', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
     db_close(conn)
@@ -1629,20 +1663,70 @@ def billing():
     db_close(conn)
     return render_template('billing.html', biz=biz, plan=plan, limits=limits, usage=usage)
 
+def _delete_proof_file(name):
+    if not name:
+        return
+    try:
+        path = os.path.join(UPLOAD_FOLDER, os.path.basename(name))
+        if os.path.isfile(path):
+            os.remove(path)
+    except Exception:
+        pass
+
 @app.route('/billing/request-upgrade', methods=['POST'])
 @login_required
 def request_upgrade():
     conn = get_db()
     bid = get_business_id()
     try:
-        query(conn, 'UPDATE businesses SET upgrade_requested = 1 WHERE id = ?', (bid,))
+        note = sanitize_input(request.form.get('transaction_ref', '')).strip()
+        if not note:
+            note = sanitize_input(request.form.get('note', '')).strip()
+        if not note:
+            note = sanitize_input(request.form.get('message', '')).strip()
+        if note:
+            note = note[:500]
+        proof_name = None
+        f = request.files.get('proof')
+        if f and f.filename:
+            ext = os.path.splitext(f.filename)[1].lower()
+            if ext not in ALLOWED_PROOF_EXT:
+                db_close(conn)
+                flash('Proof must be an image (PNG, JPG, WEBP, GIF).', 'danger')
+                return redirect(url_for('billing'))
+            proof_name = f'proof_{bid}_{secrets.token_hex(6)}{ext}'
+            f.save(os.path.join(UPLOAD_FOLDER, proof_name))
+        if not note and not proof_name:
+            db_close(conn)
+            flash('Please include a Mobile Money transaction ID or message with your request.', 'danger')
+            return redirect(url_for('billing'))
+        query(conn, '''UPDATE businesses SET upgrade_requested = 1,
+                        upgrade_note = COALESCE(?, upgrade_note),
+                        upgrade_proof = COALESCE(?, upgrade_proof),
+                        upgrade_requested_at = CURRENT_TIMESTAMP
+                        WHERE id = ?''', (note or None, proof_name, bid))
         db_commit(conn)
-        log_audit(conn, 'upgrade', 'businesses', bid, 'Requested pro upgrade')
-        flash('Upgrade request sent. You will be contacted soon.', 'success')
+        log_audit(conn, 'upgrade', 'businesses', bid, f'Requested pro upgrade. Note: {note or "none"}, proof: {proof_name or "none"}')
+        flash('Upgrade request sent to the administrator with your payment details.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
     db_close(conn)
     return redirect(url_for('billing'))
+
+@app.route('/uploads/<path:filename>')
+@login_required
+def serve_upload(filename):
+    if not filename.startswith('proof_'):
+        abort(404)
+    fname = os.path.basename(filename)
+    conn = get_db()
+    if session.get('role') != 'superadmin':
+        owner = query(conn, 'SELECT id, upgrade_proof FROM businesses WHERE upgrade_proof = ?', (fname,)).fetchone()
+        if not owner or owner['id'] != get_business_id():
+            db_close(conn)
+            abort(403)
+    db_close(conn)
+    return send_from_directory(UPLOAD_FOLDER, fname)
 
 @app.route('/admin/users')
 @admin_required

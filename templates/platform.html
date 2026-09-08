@@ -49,7 +49,12 @@
                     </td>
                     <td>{{ b['product_count'] }}</td>
                     <td>{{ b['user_count'] }}</td>
-                    <td>{% if b['upgrade_requested'] %}<span class="badge bg-warning text-dark">Requested</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                        {% if b['upgrade_requested'] %}
+                            <span class="badge bg-warning text-dark">Requested</span>
+                            <button class="btn btn-sm btn-outline-warning ms-1" data-bs-toggle="modal" data-bs-target="#upgradeModal{{ b['id'] }}"><i class="bi bi-envelope"></i></button>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
                     <td>
                         <div class="d-flex gap-1 flex-wrap">
                         {% if b['status'] == 'pending' %}
@@ -62,6 +67,43 @@
                         {% endif %}
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#planModal{{ b['id'] }}">Plan</button>
                         </div>
+                        {% if b['upgrade_requested'] %}
+                        <div class="modal fade" id="upgradeModal{{ b['id'] }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h6 class="modal-title"><i class="bi bi-envelope-fill text-warning"></i> Upgrade request — {{ b['name'] }}</h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="alert alert-warning small mb-3">
+                                            <i class="bi bi-phone"></i> Asks for <strong>Pro</strong> ({{ PRO_PRICE if PRO_PRICE else 'UGX 15,000 / month' }}). Confirm the Mobile Money payment to {{ PAYMENT_PHONE }}, then set their plan below.
+                                        </div>
+                                        {% if b['upgrade_requested_at'] %}
+                                        <div class="small text-muted mb-2"><i class="bi bi-clock"></i> Requested {{ b['upgrade_requested_at'][:16] if b['upgrade_requested_at'] is string else b['upgrade_requested_at'].strftime('%Y-%m-%d %H:%M') }}</div>
+                                        {% endif %}
+                                        <div class="mb-2">
+                                            <label class="form-label small fw-bold">Message / transaction ID</label>
+                                            <div class="border rounded p-3 bg-light">{{ b['upgrade_note'] or '— no message —' }}</div>
+                                        </div>
+                                        {% if b['upgrade_proof'] %}
+                                        <label class="form-label small fw-bold">Payment proof</label>
+                                        <a href="{{ url_for('serve_upload', filename=b['upgrade_proof']) }}" target="_blank">
+                                            <img src="{{ url_for('serve_upload', filename=b['upgrade_proof']) }}" alt="Payment proof" class="img-fluid border rounded" style="max-height:220px;">
+                                        </a>
+                                        {% else %}<em class="small text-muted">No proof uploaded.</em>{% endif %}
+                                    </div>
+                                    <div class="modal-footer d-flex justify-content-between">
+                                        <form method="POST" action="{{ url_for('platform_clear_upgrade', id=b['id']) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button class="btn btn-sm btn-outline-secondary">Dismiss</button>
+                                        </form>
+                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#planModal{{ b['id'] }}">Confirm payment → set plan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                         <div class="modal fade" id="planModal{{ b['id'] }}" tabindex="-1">
                             <div class="modal-dialog modal-sm">
                                 <div class="modal-content">
