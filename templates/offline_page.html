@@ -27,25 +27,25 @@
                 <span class="badge bg-primary" id="pendingBadge">0 pending</span>
             </div>
             <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-md-4">
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
                         <label class="form-label small fw-bold mb-1">Product</label>
-                        <select id="sellProduct" class="form-select form-select-sm"></select>
+                        <select id="sellProduct" class="form-select"></select>
                         <datalist id="quickProductList"></datalist>
                     </div>
-                    <div class="col-3 col-md-2">
+                    <div class="col-6 col-md-2">
                         <label class="form-label small fw-bold mb-1">Qty</label>
-                        <input type="number" id="sellQty" class="form-control form-control-sm" min="1" value="">
+                        <input type="number" id="sellQty" class="form-control" min="1" value="">
                     </div>
-                    <div class="col-4 col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label small fw-bold mb-1">Unit price</label>
-                        <div class="input-group input-group-sm">
+                        <div class="input-group">
                             <span class="input-group-text" id="currency">.</span>
                             <input type="number" id="sellPrice" class="form-control" step="any" min="0">
                         </div>
                     </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button id="addLineBtn" class="btn btn-outline-brand w-100 btn-sm"><i class="bi bi-plus-lg"></i> Add item</button>
+                    <div class="col-12 col-md-3 d-flex align-items-end">
+                        <button id="addLineBtn" class="btn btn-outline-brand w-100"><i class="bi bi-plus-lg me-1"></i>Add item</button>
                     </div>
                 </div>
                 <div class="mt-2">
@@ -58,12 +58,12 @@
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="d-flex gap-2 flex-wrap">
                             <div class="col-lg-3 col-8">
-                                <select id="sellCustomer" class="form-select form-select-sm">
+                                <select id="sellCustomer" class="form-select">
                                     <option value="">Walk-in (no customer)</option>
                                 </select>
                             </div>
                             <div class="col-lg-3 col-8">
-                                <input type="text" id="sellCustomerName" class="form-control form-control-sm" placeholder="Customer name (optional)">
+                                <input type="text" id="sellCustomerName" class="form-control" placeholder="Customer name (optional)">
                             </div>
                         </div>
                         <div class="text-end">
@@ -84,26 +84,26 @@
         <div class="card shadow h-100">
             <div class="card-header fw-bold"><i class="bi bi-box-seam"></i> Add product</div>
             <div class="card-body">
-                <div class="row g-2">
+                <div class="row g-3">
                     <div class="col-12">
-                        <input type="text" id="pTitle" class="form-control form-control-sm" placeholder="Product title (required)">
+                        <input type="text" id="pTitle" class="form-control" placeholder="Product title (required)">
                         <datalist id="productCategoryList"></datalist>
-                        <input type="text" id="pCategory" class="form-control form-control-sm mt-1" placeholder="Category" list="productCategoryList">
+                        <input type="text" id="pCategory" class="form-control mt-2" placeholder="Category" list="productCategoryList">
                     </div>
-                    <div class="col-4">
-                        <input type="number" id="pQty" class="form-control form-control-sm" placeholder="Qty" min="0">
+                    <div class="col-6 col-md-4">
+                        <input type="number" id="pQty" class="form-control" placeholder="Qty" min="0">
                     </div>
-                    <div class="col-4">
-                        <input type="number" id="pBuy" class="form-control form-control-sm" placeholder="Buy price" step="any" min="0">
+                    <div class="col-6 col-md-4">
+                        <input type="number" id="pBuy" class="form-control" placeholder="Buy price" step="any" min="0">
                     </div>
-                    <div class="col-4">
-                        <input type="number" id="pSell" class="form-control form-control-sm" placeholder="Sell price" step="any" min="0">
+                    <div class="col-6 col-md-4">
+                        <input type="number" id="pSell" class="form-control" placeholder="Sell price" step="any" min="0">
                     </div>
                     <div class="col-12">
-                        <input type="text" id="pNotes" class="form-control form-control-sm" placeholder="Notes (optional)">
+                        <input type="text" id="pNotes" class="form-control" placeholder="Notes (optional)">
                     </div>
                 </div>
-                <button id="queueProductBtn" class="btn btn-outline-brand w-100 mt-3 btn-sm"><i class="bi bi-plus"></i> Queue product</button>
+                <button id="queueProductBtn" class="btn btn-outline-brand w-100 mt-3"><i class="bi bi-plus me-1"></i>Queue product</button>
             </div>
         </div>
     </div>
@@ -111,13 +111,13 @@
         <div class="card shadow h-100">
             <div class="card-header fw-bold"><i class="bi bi-people"></i> Add customer</div>
             <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-12"><input type="text" id="cName" class="form-control form-control-sm" placeholder="Customer name (required)"></div>
-                    <div class="col-6"><input type="text" id="cPhone" class="form-control form-control-sm" placeholder="Phone"></div>
-                    <div class="col-6"><input type="email" id="cEmail" class="form-control form-control-sm" placeholder="Email"></div>
-                    <div class="col-12"><input type="text" id="cAddress" class="form-control form-control-sm" placeholder="Address"></div>
+                <div class="row g-3">
+                    <div class="col-12"><input type="text" id="cName" class="form-control" placeholder="Customer name (required)"></div>
+                    <div class="col-12 col-md-6"><input type="text" id="cPhone" class="form-control" placeholder="Phone"></div>
+                    <div class="col-12 col-md-6"><input type="email" id="cEmail" class="form-control" placeholder="Email"></div>
+                    <div class="col-12"><input type="text" id="cAddress" class="form-control" placeholder="Address"></div>
                 </div>
-                <button id="queueCustomerBtn" class="btn btn-outline-brand w-100 mt-3 btn-sm"><i class="bi bi-plus"></i> Queue customer</button>
+                <button id="queueCustomerBtn" class="btn btn-outline-brand w-100 mt-3"><i class="bi bi-plus me-1"></i>Queue customer</button>
             </div>
         </div>
     </div>
@@ -128,13 +128,13 @@
         <div class="card shadow h-100">
             <div class="card-header fw-bold"><i class="bi bi-receipt"></i> Add expense</div>
             <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-12"><input type="text" id="eDesc" class="form-control form-control-sm" placeholder="Description (required)"></div>
+                <div class="row g-3">
+                    <div class="col-12"><input type="text" id="eDesc" class="form-control" placeholder="Description (required)"></div>
                     <datalist id="expenseCategoryList"></datalist>
-                    <div class="col-6"><input type="text" id="eCategory" class="form-control form-control-sm" placeholder="Category" list="expenseCategoryList"></div>
-                    <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text" id="currency3">.</span><input type="number" id="eAmount" class="form-control" placeholder="Amount" step="any" min="0"></div></div>
+                    <div class="col-12 col-md-6"><input type="text" id="eCategory" class="form-control" placeholder="Category" list="expenseCategoryList"></div>
+                    <div class="col-12 col-md-6"><div class="input-group"><span class="input-group-text" id="currency3">.</span><input type="number" id="eAmount" class="form-control" placeholder="Amount" step="any" min="0"></div></div>
                 </div>
-                <button id="queueExpenseBtn" class="btn btn-outline-brand w-100 mt-3 btn-sm"><i class="bi bi-plus"></i> Queue expense</button>
+                <button id="queueExpenseBtn" class="btn btn-outline-brand w-100 mt-3"><i class="bi bi-plus me-1"></i>Queue expense</button>
             </div>
         </div>
     </div>
@@ -142,19 +142,19 @@
         <div class="card shadow h-100">
             <div class="card-header fw-bold"><i class="bi bi-arrow-repeat"></i> Adjust stock</div>
             <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-12"><select id="stockProduct" class="form-select form-select-sm"></select></div>
-                    <div class="col-6"><select id="stockType" class="form-select form-select-sm">
+                <div class="row g-3">
+                    <div class="col-12"><select id="stockProduct" class="form-select"></select></div>
+                    <div class="col-12 col-md-6"><select id="stockType" class="form-select">
                         <option value="restock">Restock</option>
                         <option value="correction">Correction</option>
                         <option value="damaged">Damaged</option>
                         <option value="stolen">Stolen</option>
                         <option value="returned">Returned</option>
                     </select></div>
-                    <div class="col-6"><input type="number" id="stockQty" class="form-control form-control-sm" placeholder="Quantity" min="1"></div>
-                    <div class="col-12"><input type="text" id="stockReason" class="form-control form-control-sm" placeholder="Reason (optional)"></div>
+                    <div class="col-12 col-md-6"><input type="number" id="stockQty" class="form-control" placeholder="Quantity" min="1"></div>
+                    <div class="col-12"><input type="text" id="stockReason" class="form-control" placeholder="Reason (optional)"></div>
                 </div>
-                <button id="queueAdjustBtn" class="btn btn-outline-brand w-100 mt-3 btn-sm"><i class="bi bi-arrow-repeat"></i> Queue adjustment</button>
+                <button id="queueAdjustBtn" class="btn btn-outline-brand w-100 mt-3"><i class="bi bi-arrow-repeat me-1"></i>Queue adjustment</button>
             </div>
         </div>
     </div>

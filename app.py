@@ -2,6 +2,7 @@ import os, sys, csv, io, re, secrets, smtplib
 import sqlite3
 from functools import wraps
 from datetime import date, datetime, timedelta
+from urllib.parse import urlparse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import (Flask, render_template, request, redirect, url_for,
@@ -61,6 +62,19 @@ DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath
 IS_PG = bool(DATABASE_URL)
 
 PER_PAGE = 20
+
+@app.errorhandler(400)
+def bad_request(e):
+    desc = str(getattr(e, 'description', 'Bad request'))
+    if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({'error': desc}), 400
+    ref = request.referrer
+    if ref and urlparse(ref).netloc == request.host:
+        flash('Session token expired — please try that again.', 'warning')
+        return redirect(ref)
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+    return render_template('error.html', error=desc, code=400), 400
 
 @app.errorhandler(500)
 def internal_error(e):
