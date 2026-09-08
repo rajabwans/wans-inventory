@@ -10,20 +10,8 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label">Title *</label>
+                            <label class="form-label">Product name *</label>
                             <input type="text" name="title" class="form-control" value="{{ product.title }}" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Author</label>
-                            <input type="text" name="author" class="form-control" value="{{ product.author or '' }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">ISBN</label>
-                            <input type="text" name="isbn" class="form-control" value="{{ product.isbn or '' }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Publisher</label>
-                            <input type="text" name="publisher" class="form-control" value="{{ product.publisher or '' }}">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Category</label>
@@ -37,21 +25,17 @@
                                 {% endif %}
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label">Quantity *</label>
                             <input type="number" name="quantity" class="form-control" value="{{ product.quantity }}" min="0" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label">Buying Price ({{ CURRENCY }}) *</label>
                             <input type="number" step="1" name="buying_price" class="form-control" value="{{ product.buying_price }}" min="0" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label">Selling Price ({{ CURRENCY }}) *</label>
                             <input type="number" step="1" name="selling_price" class="form-control" value="{{ product.selling_price }}" min="0" required>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Notes</label>
-                            <textarea name="notes" class="form-control" rows="2">{{ product.notes or '' }}</textarea>
                         </div>
                     </div>
                     <div class="mt-4 d-flex gap-2">
