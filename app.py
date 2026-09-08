@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, session, send_file, send_from_directory, abort, g)
+                   flash, session, send_file, send_from_directory, abort, g, jsonify)
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -106,7 +106,8 @@ def block_suspended():
             return redirect(url_for('login'))
         if status == 'pending' and request.endpoint not in ('logout', 'static'):
             return render_template('error.html', error='Your business is still awaiting approval.'), 403
-        allowed = ('logout', 'static', 'billing', 'request_upgrade', 'platform', 'serve_upload')
+        allowed = ('logout', 'static', 'billing', 'request_upgrade', 'platform', 'serve_upload',
+                   'api_offline_snapshot', 'api_sync')
         if status == 'active' and session.get('role') != 'superadmin' \
                 and get_effective_plan() == 'expired' and request.endpoint not in allowed:
             flash('Your free trial has ended. Activate Pro to continue using WanPlan.', 'warning')
@@ -166,6 +167,13 @@ def query(conn, sql, params=None):
 def db_commit(conn):
     if not IS_PG:
         conn.commit()
+
+def insert_row(conn, sql, params=None):
+    if IS_PG:
+        cur = query(conn, sql + ' RETURNING id', params)
+        return cur.fetchone()['id']
+    cur = conn.execute(sql, params or [])
+    return cur.lastrowid
 
 def db_close(conn):
     conn.close()
@@ -688,6 +696,14 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/offline')
+@login_required
+def offline_page():
+    if get_effective_plan() == 'expired':
+        flash('Your free trial has ended. Activate Pro to continue using {}'.format(PRODUCT_NAME), 'warning')
+        return redirect(url_for('billing'))
+    return render_template('offline_page.html')
 
 @app.route('/dashboard')
 @login_required
@@ -1804,6 +1820,264 @@ def serve_upload(filename):
             abort(403)
     db_close(conn)
     return send_from_directory(UPLOAD_FOLDER, fname)
+
+def api_login():
+    return jsonify({'error': 'unauthorized'}), 401
+
+ALLOWED_ADJUST_TYPES = ('damaged', 'stolen', 'returned', 'correction', 'restock')
+
+def resolve_client_ref(resolved, ref):
+    if ref is None:
+        return None, None
+    if isinstance(ref, bool):
+        return None, 'invalid reference'
+    if isinstance(ref, int):
+        return ref, None
+    if isinstance(ref, str):
+        if ref.isdigit():
+            try:
+                return int(ref), None
+            except Exception:
+                pass
+        if ref in resolved:
+            return resolved[ref], None
+        return None, 'unknown reference'
+    return None, 'invalid reference'
+
+@app.route('/api/offline-snapshot')
+def api_offline_snapshot():
+    if not session.get('user_id'):
+        return api_login()
+    if session.get('biz', {}).get('status') == 'suspended':
+        return jsonify({'error': 'account suspended'}), 403
+    conn = get_db()
+    bid = get_business_id()
+    try:
+        products = [dict(r) for r in query(conn,
+            'SELECT id, title, category, quantity, buying_price, selling_price FROM products WHERE business_id = ?',
+            (bid,)).fetchall()]
+        customers = [dict(r) for r in query(conn,
+            'SELECT id, name, phone, email, address FROM customers WHERE business_id = ?', (bid,)).fetchall()]
+        cats = [dict(r) for r in query(conn,
+            'SELECT id, name, kind FROM categories WHERE business_id = ?', (bid,)).fetchall()]
+        plan = get_effective_plan()
+        biz = session.get('biz', {})
+        meta = {
+            'business_id': bid,
+            'name': session.get('biz', {}).get('name') or COMPANY_NAME,
+            'currency': session.get('biz', {}).get('currency') or CURRENCY,
+            'plan': plan,
+            'limits': PLAN_LIMITS.get(plan, PLAN_LIMITS['trial']),
+            'trial_ends_at': str(biz.get('trial_ends_at')) if biz.get('trial_ends_at') else None,
+            'paid_until': str(biz.get('paid_until')) if biz.get('paid_until') else None,
+            'pay_phone': PAYMENT_PHONE,
+            'pro_price': PRO_PRICE,
+            'product_name': PRODUCT_NAME,
+        }
+    except Exception as e:
+        db_close(conn)
+        return jsonify({'error': 'failed to load snapshot: %s' % e}), 500
+    db_close(conn)
+    return jsonify({'meta': meta, 'products': products, 'customers': customers, 'categories': cats})
+
+@app.route('/api/sync', methods=['POST'])
+def api_sync():
+    if not session.get('user_id'):
+        return api_login()
+    if session.get('biz', {}).get('status') == 'suspended':
+        return jsonify({'error': 'account suspended'}), 403
+    if get_effective_plan() == 'expired':
+        return jsonify({
+            'blocked': True,
+            'message': 'Your free trial has ended. Activate Pro to continue using {}.'.format(PRODUCT_NAME)
+        }), 403
+    body = request.get_json(force=True, silent=True) or {}
+    ops = body.get('ops')
+    if not isinstance(ops, list):
+        return jsonify({'error': 'ops must be a list'}), 400
+    ops = ops[:500]
+    conn = get_db()
+    bid = get_business_id()
+    resolved = {}
+    results = []
+    try:
+        for op in ops:
+            if not isinstance(op, dict):
+                results.append({'client_id': None, 'status': 'error', 'message': 'Malformed operation'})
+                continue
+            _sp_begin(conn)
+            try:
+                out = _apply_sync_op(conn, bid, op, resolved)
+                out['client_id'] = op.get('client_id')
+                results.append(out)
+                _sp_release(conn)
+            except Exception as e:
+                _sp_rollback(conn)
+                results.append({'client_id': op.get('client_id'),
+                                'status': 'error',
+                                'message': 'Error applying "{}": {}'.format(op.get('op'), e)})
+        db_commit(conn)
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({'error': 'sync failed: %s' % e}), 500
+    db_close(conn)
+    return jsonify({'results': results})
+
+def _sp_begin(conn):
+    if not IS_PG:
+        conn.execute('SAVEPOINT wanplan_sync')
+
+def _sp_release(conn):
+    if not IS_PG:
+        try:
+            conn.execute('RELEASE SAVEPOINT wanplan_sync')
+        except Exception:
+            pass
+
+def _sp_rollback(conn):
+    if not IS_PG:
+        try:
+            conn.execute('ROLLBACK TO SAVEPOINT wanplan_sync')
+            conn.execute('RELEASE SAVEPOINT wanplan_sync')
+        except Exception:
+            pass
+
+def _resolve_op_product(conn, bid, resolved, ref):
+    pid, err = resolve_client_ref(resolved, ref)
+    if err:
+        raise ValueError(err)
+    row = query(conn, 'SELECT id, title, quantity, buying_price FROM products WHERE id = ? AND business_id = ?', (pid, bid)).fetchone()
+    if not row:
+        raise ValueError('product not found')
+    return row
+
+def _apply_sync_op(conn, bid, op, resolved):
+    kind = op.get('op')
+    if kind == 'product':
+        title = sanitize_input(op.get('title'))
+        if not title:
+            raise ValueError('Product title is required')
+        try:
+            quantity = max(0, int(op.get('quantity', 0)))
+            buying_price = max(0, float(op.get('buying_price', 0)))
+            selling_price = max(0, float(op.get('selling_price', 0)))
+        except (ValueError, TypeError):
+            raise ValueError('Invalid number values')
+        if not check_limit(conn, 'products'):
+            raise ValueError('Product limit reached on your {} plan'.format(get_effective_plan().capitalize()))
+        cid = op.get('client_id')
+        pid = insert_row(conn, '''INSERT INTO products
+                (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?)''',
+            (bid, title, '', '', '', sanitize_input(op.get('category')), quantity, buying_price, selling_price, sanitize_input(op.get('notes'))))
+        resolved[cid] = pid
+        log_audit(conn, 'create', 'products', pid, 'Added (offline sync): {}'.format(title))
+        return {'status': 'ok', 'real_id': pid}
+    if kind == 'customer':
+        name = sanitize_input(op.get('name'))
+        if not name:
+            raise ValueError('Customer name is required')
+        if not check_limit(conn, 'customers'):
+            raise ValueError('Customer limit reached on your {} plan'.format(get_effective_plan().capitalize()))
+        cid = op.get('client_id')
+        pid = insert_row(conn, 'INSERT INTO customers (business_id, name, phone, email, address) VALUES (?,?,?,?,?)',
+            (bid, name, sanitize_input(op.get('phone')), sanitize_input(op.get('email')), sanitize_input(op.get('address'))))
+        resolved[cid] = pid
+        log_audit(conn, 'create', 'customers', pid, 'Added (offline sync): {}'.format(name))
+        return {'status': 'ok', 'real_id': pid}
+    if kind == 'expense':
+        description = sanitize_input(op.get('description'))
+        if not description:
+            raise ValueError('Description is required')
+        try:
+            amount = float(op.get('amount', 0))
+        except (ValueError, TypeError):
+            raise ValueError('Invalid amount')
+        if amount <= 0:
+            raise ValueError('Amount must be positive')
+        eid = insert_row(conn, 'INSERT INTO expenses (business_id, description, amount, category, user_id) VALUES (?,?,?,?,?)',
+            (bid, description, amount, sanitize_input(op.get('category')), session.get('user_id')))
+        log_audit(conn, 'create', 'expenses', eid, 'Expense (offline sync): {} - {} {}'.format(description, CURRENCY, amount if isinstance(amount, str) else '{:,.0f}'.format(amount)))
+        return {'status': 'ok', 'real_id': eid}
+    if kind == 'adjust':
+        product = _resolve_op_product(conn, bid, resolved, op.get('product_ref'))
+        adj_type = sanitize_input(op.get('adjustment_type'))
+        if adj_type not in ALLOWED_ADJUST_TYPES:
+            raise ValueError('Invalid adjustment type')
+        try:
+            quantity = int(op.get('quantity', 0))
+        except (ValueError, TypeError):
+            raise ValueError('Invalid quantity')
+        if quantity <= 0:
+            raise ValueError('Quantity must be positive')
+        if adj_type == 'correction':
+            new_qty = quantity
+        elif adj_type in ('damaged', 'stolen'):
+            new_qty = product['quantity'] - quantity
+            if new_qty < 0:
+                raise ValueError('Cannot remove {} units. Only {} in stock.'.format(quantity, product['quantity']))
+        else:
+            new_qty = product['quantity'] + quantity
+        query(conn, 'INSERT INTO stock_adjustments (business_id, product_id, adjustment_type, quantity, reason, user_id) VALUES (?,?,?,?,?,?)',
+            (bid, product['id'], adj_type, quantity, sanitize_input(op.get('reason')), session.get('user_id')))
+        query(conn, 'UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?',
+            (new_qty, product['id'], bid))
+        log_audit(conn, 'adjust', 'products', product['id'], '{} (offline sync): {} units of {}'.format(adj_type, quantity, product['title']))
+        return {'status': 'ok', 'real_id': product['id']}
+    if kind == 'sale':
+        items = op.get('items')
+        if not isinstance(items, list) or not items:
+            raise ValueError('A sale needs at least one item')
+        used = {}
+        first_id = None
+        total_amount = 0.0
+        for item in items:
+            product = _resolve_op_product(conn, bid, resolved, item.get('product_ref'))
+            try:
+                qty = int(item.get('qty'))
+                unit_price = float(item.get('unit_price'))
+            except (ValueError, TypeError):
+                raise ValueError('Invalid item values')
+            if qty <= 0:
+                raise ValueError('Quantity must be positive')
+            if unit_price <= 0:
+                raise ValueError('Unit price must be positive')
+            avail = product['quantity'] - used.get(product['id'], 0)
+            if avail < qty:
+                raise ValueError('Not enough stock for {} ({}). Available: {}'.format(product['title'], product['id'], avail))
+            used[product['id']] = used.get(product['id'], 0) + qty
+            total_amount += unit_price * qty
+        customer_id = None
+        if op.get('customer_ref'):
+            cid, err = resolve_client_ref(resolved, op.get('customer_ref'))
+            if err:
+                raise ValueError('Unknown customer reference')
+            row = query(conn, 'SELECT id FROM customers WHERE id = ? AND business_id = ?', (cid, bid)).fetchone()
+            if not row:
+                raise ValueError('Customer not found')
+            customer_id = row['id']
+        customer_name = sanitize_input(op.get('customer_name'))
+        for item in items:
+            product = _resolve_op_product(conn, bid, resolved, item.get('product_ref'))
+            qty = int(item.get('qty'))
+            unit_price = float(item.get('unit_price'))
+            amt = unit_price * qty
+            profit = (unit_price - product['buying_price']) * qty
+            sid = insert_row(conn, '''INSERT INTO sales
+                    (business_id, product_id, customer_id, customer_name, quantity_sold, unit_price, total_amount, profit)
+                    VALUES (?,?,?,?,?,?,?,?)''',
+                (bid, product['id'], customer_id, customer_name, qty, unit_price, amt, profit))
+            query(conn, 'UPDATE products SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?',
+                (qty, product['id'], bid))
+            if first_id is None:
+                first_id = sid
+            total_amount += 0
+        log_audit(conn, 'create', 'sales', first_id, 'Sale (offline sync): {} item(s) for {} {}'.format(len(items), CURRENCY, '{:,.0f}'.format(total_amount)))
+        return {'status': 'ok', 'real_id': first_id, 'items': len(items)}
+    raise ValueError('Unknown operation: {}'.format(kind))
 
 @app.route('/admin/users')
 @admin_required

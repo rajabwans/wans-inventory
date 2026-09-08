@@ -1,4 +1,4 @@
-const VERSION = 'wanplan-v2';
+const VERSION = 'wanplan-v3';
 
 const PRECACHE = [
   '/wans/static/style.css',

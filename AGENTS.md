@@ -125,7 +125,35 @@ itself is called WANPLAN.
 - Strategy: navigations = network-first (cached copy under key `/wanplan-shell` reused offline); same-origin
   static = stale-while-revalidate; CDN (jsdelivr/fonts) = stale-while-revalidate; final offline fallback =
   `static/offline.html`. Registration snippet in both base templates (`scope:'/wans/'`).
-- Bump `VERSION` in `sw.js` when the precache list changes.
+- Bump `VERSION` in `sw.js` when the precache list changes. Currently `wanplan-v3`.
+
+## Offline mode (Quick Sell)
+- Route `/offline` (login_required) → `templates/offline_page.html` + `static/offline.js`.
+  Nav entry "Quick Sell (Offline)" (topnav + dropdown). Expired plan → redirect to billing.
+- **Client (offline.js)**: IndexedDB `wanplan` v1 — stores kv/products/customers/categories/queue.
+  Everything is queued locally (created_at order via push), synced oldest-first, retried on errors
+  (failed ops get `last_error` and stay in queue). Cart = multi-line quick sale; auto-sync on reconnect.
+- **`window.WANPLAN.csrf`** is embedded in `base.html` (after bootstrap bundle) and reused for the sync API
+  header `X-CSRFToken`. NOTE: `session.clear()` on login wipes the Flask-WTF token, so the sync page must
+  read a token from a POST-login render (the embedded `WANPLAN.csrf`), NOT the login page.
+- **Sync API contract** (`POST /api/sync`, JSON `{ops:[...]}`, max 500, CSRF via `X-CSRFToken` header):
+  per-op `results[]` with `{client_id, status, real_id?, message?}`; SAVEPOINT per op on SQLite so failures
+  are independent. `GET /api/offline-snapshot` returns products/customers/categories/meta. Both are exempted
+  from the expired-plan redirect (return clean JSON error instead).
+- **Resolved-refs contract (CRITICAL)**: for an op referencing a product/customer created in the SAME batch,
+  the reference is the temp id (`p_...`/`c_...`), and the creating op MUST use that same temp id as its
+  `client_id` — the server records `resolved[client_id] = real_id` per product/customer op, then later ops
+  resolve string refs through that map (ints pass straight through). Ops must be sent oldest-first so the
+  creating op arrives before any op referencing it. Temp ids on client side also let the client rekey its
+  local copies to real ids from `resolved` (idMap).
+- Op types: `product` (title, category, quantity, buying_price, selling_price, notes), `customer`
+  (name, phone, email, address), `expense` (description, amount, category), `adjust`
+  (product_ref, adjustment_type ∈ `ALLOWED_ADJUST_TYPES` = damaged/stolen/returned/correction/restock,
+  quantity, reason), `sale` (items[{product_ref, qty, unit_price}], customer_ref, customer_name — used to
+  auto-create a walk-in customer if no customer_ref). Stock is re-checked server-side; `check_limit`
+  enforced for trial plans.
+- `insert_row(conn, sql, params)` helper: SQLite → `cursor.lastrowid`, PG → `RETURNING id`. Use it for
+  any INSERT that must return the id (avoids IS_PG branching).
 
 ## Email upgrade notifications
 - `send_upgrade_notification(name, slug, ref, proof)` in app.py emails `NOTIFY_EMAIL`
