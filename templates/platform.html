@@ -39,12 +39,12 @@
                     <td>
                         {% set st = biz_plan_state(b) %}
                         {% if st == 'pro' %}<span class="badge bg-primary">Pro</span>
-                        {% elif st == 'trial' %}<span class="badge bg-info text-dark">Trial <small>until {{ (b['trial_ends_at'] or '')[:10] }}</small></span>
+                        {% elif st == 'trial' %}<span class="badge bg-info text-dark">Trial <small>until {{ (b['trial_ends_at']|shortdate)[:10] }}</small></span>
                         {% else %}<span class="badge bg-danger">Expired</span>{% endif %}
                     </td>
                     <td>
                         {% if b['plan']=='pro' %}
-                            {{ (b['paid_until'] or 'never')[:10] if b['paid_until'] else 'never' }}
+                            {{ (b['paid_until']|shortdate)[:10] if b['paid_until'] else 'never' }}
                         {% else %}<span class="text-muted">—</span>{% endif %}
                     </td>
                     <td>{{ b['product_count'] }}</td>
@@ -80,7 +80,7 @@
                                             <i class="bi bi-phone"></i> Asks for <strong>Pro</strong> ({{ PRO_PRICE if PRO_PRICE else 'UGX 15,000 / month' }}). Confirm the Mobile Money payment to {{ PAYMENT_PHONE }}, then set their plan below.
                                         </div>
                                         {% if b['upgrade_requested_at'] %}
-                                        <div class="small text-muted mb-2"><i class="bi bi-clock"></i> Requested {{ b['upgrade_requested_at'][:16] if b['upgrade_requested_at'] is string else b['upgrade_requested_at'].strftime('%Y-%m-%d %H:%M') }}</div>
+                                        <div class="small text-muted mb-2"><i class="bi bi-clock"></i> Requested {{ b['upgrade_requested_at']|shortdate }}</div>
                                         {% endif %}
                                         <div class="mb-2">
                                             <label class="form-label small fw-bold">Message / transaction ID</label>
@@ -98,7 +98,7 @@
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                             <button class="btn btn-sm btn-outline-secondary">Dismiss</button>
                                         </form>
-                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#planModal{{ b['id'] }}">Confirm payment → set plan</button>
+                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#planModal{{ b['id'] }}" onclick="document.querySelector('#planModal{{ b['id'] }} select[name=plan]').value='pro'">Confirm payment → set plan</button>
                                     </div>
                                 </div>
                             </div>
@@ -114,15 +114,20 @@
                                             <div class="mb-2">
                                                 <label class="form-label small fw-bold">Plan</label>
                                                 <select name="plan" class="form-select">
-                                                    <option value="free" {% if b['plan']!='pro' %}selected{% endif %}>Trial (7 days)</option>
+                                                    <option value="free" {% if b['plan']!='pro' %}selected{% endif %}>Free / Trial</option>
                                                     <option value="pro" {% if b['plan']=='pro' %}selected{% endif %}>Pro (unlimited)</option>
                                                 </select>
                                             </div>
                                             <div class="mb-2">
-                                                <label class="form-label small fw-bold">Paid until (date)</label>
-                                                <input type="date" name="paid_until" class="form-control" value="{{ (b['paid_until'] or '')[:10] }}">
+                                                <label class="form-label small fw-bold">Trial ends (date)</label>
+                                                <input type="date" name="trial_until" class="form-control" value="{{ (b['trial_ends_at']|shortdate)[:10] }}">
+                                                <div class="form-text">For Free/Trial plans: the day the free trial ends. Leave empty to disable trial (business locks until paid).</div>
                                             </div>
-                                            <div class="form-text">Empty paid-until = never expires (lifetime). Pro plan counts as active while paid. Non-Pro businesses get a 7-day trial from approval, then lock until they pay.</div>
+                                            <div class="mb-2">
+                                                <label class="form-label small fw-bold">Paid until (date) — Pro</label>
+                                                <input type="date" name="paid_until" class="form-control" value="{{ (b['paid_until']|shortdate)[:10] }}">
+                                            </div>
+                                            <div class="form-text">Empty paid-until = never expires (lifetime). Pro plan counts as active while paid. Non-Pro businesses get a 7-day trial from approval, then lock until they pay. Use "Trial ends" above to extend or shorten the trial.</div>
                                         </div>
                                         <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
                                     </form>

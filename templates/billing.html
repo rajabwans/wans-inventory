@@ -16,7 +16,7 @@
                 <p class="text-muted small mb-1">{{ biz['name'] }}</p>
                 {% if plan == 'pro' %}
                     {% if biz['paid_until'] %}
-                        <span class="badge bg-success">Paid until {{ (biz['paid_until'] or '')[:10] }}</span>
+                        <span class="badge bg-success">Paid until {{ (biz['paid_until']|shortdate)[:10] }}</span>
                     {% else %}
                         <span class="badge bg-primary">Lifetime</span>
                     {% endif %}

@@ -114,6 +114,17 @@ def inject_globals():
                 biz_plan_state=biz_plan_state,
                 current_year=date.today().year)
 
+@app.template_filter('shortdate')
+def shortdate(v):
+    if v is None or v == '':
+        return ''
+    if isinstance(v, str):
+        return v[:16]
+    try:
+        return v.strftime('%Y-%m-%d %H:%M')
+    except Exception:
+        return ''
+
 if IS_PG:
     import psycopg2
     import psycopg2.extras
@@ -1608,21 +1619,29 @@ def platform_set_plan(id):
     plan = sanitize_input(request.form.get('plan', 'free'))
     if plan not in ('free', 'pro'):
         plan = 'free'
+    trial_until_raw = sanitize_input(request.form.get('trial_until', ''))
     paid_until_raw = sanitize_input(request.form.get('paid_until', ''))
     conn = get_db()
     try:
-        if paid_until_raw:
-            paid_until = paid_until_raw.strip()
-        else:
-            paid_until = None
-        query(conn, 'UPDATE businesses SET plan = ?, paid_until = ? WHERE id = ?', (plan, paid_until, id))
+        paid_until = paid_until_raw.strip() or None
+        trial_until = trial_until_raw.strip() or None
         if plan == 'pro':
+            query(conn, 'UPDATE businesses SET plan = ?, paid_until = ?, trial_ends_at = NULL WHERE id = ?',
+                  (plan, paid_until, id))
             old = query(conn, 'SELECT upgrade_proof FROM businesses WHERE id = ?', (id,)).fetchone()
             query(conn, '''UPDATE businesses SET upgrade_requested = 0, upgrade_note = NULL,
                             upgrade_proof = NULL, upgrade_requested_at = NULL WHERE id = ?''', (id,))
             _delete_proof_file(old['upgrade_proof'] if old else None)
+        else:
+            query(conn, 'UPDATE businesses SET plan = ?, paid_until = NULL WHERE id = ?', (plan, id))
+            if trial_until:
+                end = f'{trial_until} 23:59:59'
+                query(conn, "UPDATE businesses SET trial_ends_at = ? WHERE id = ?", (end, id))
+            else:
+                query(conn, 'UPDATE businesses SET trial_ends_at = NULL WHERE id = ?', (id,))
         db_commit(conn)
-        log_audit(conn, 'plan', 'businesses', id, f'Set business #{id} plan: {plan}, paid until {paid_until or "never"}')
+        log_audit(conn, 'plan', 'businesses', id,
+                  f'Set business #{id} plan: {plan}, paid until {paid_until or "never"}, trial until {trial_until or "none"}')
         flash('Plan updated', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
