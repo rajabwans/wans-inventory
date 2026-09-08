@@ -36,7 +36,7 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.02em; }
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 1040;
-    height: 68px;
+    min-height: 68px;
     background: linear-gradient(135deg, rgba(23,21,59,.96), rgba(30,27,75,.93));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -432,7 +432,12 @@ a.card:hover { transform: translateY(-2px); }
 
 @media (max-width: 768px) {
     #appBody { padding-top: 60px; }
-    .topnav { height: 60px; }
+    .topnav { min-height: 60px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .topnav .navbar-collapse {
+        max-height: calc(100vh - 60px);
+        overflow-y: auto;
+        padding: .5rem 0 .75rem;
+    }
     .auth-card { padding: 1.6rem; }
     .landing-hero { padding: 3rem 1.25rem; }
 }

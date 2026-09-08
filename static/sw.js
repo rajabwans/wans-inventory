@@ -1,4 +1,4 @@
-const VERSION = 'wanplan-v4';
+const VERSION = 'wanplan-v5';
 
 const PRECACHE = [
   '/wans/static/style.css',
@@ -9,7 +9,9 @@ const PRECACHE = [
   '/wans/static/apple-touch-icon.png',
   '/wans/static/icon-maskable-512.png',
   '/wans/static/offline.html',
+  '/wans/static/offline.js',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
 ];
