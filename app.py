@@ -1571,6 +1571,18 @@ def manage_business():
     db_close(conn)
     return render_template('auth/manage_business.html', biz=biz)
 
+@app.route('/sw.js')
+def sw():
+    resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = URL_PREFIX + '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+@app.route('/manifest.webmanifest')
+def manifest():
+    return send_from_directory('static', 'manifest.webmanifest',
+                               mimetype='application/manifest+json')
+
 @app.route('/platform')
 @superadmin_required
 def platform():

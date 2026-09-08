@@ -1,0 +1,16 @@
+{
+  "name": "WANPLAN — wanland planner",
+  "short_name": "WANPLAN",
+  "description": "The inventory system for small businesses. Track products, sales, customers, expenses and profits — in one place.",
+  "start_url": "/wans/",
+  "scope": "/wans/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6fb",
+  "theme_color": "#4338ca",
+  "icons": [
+    { "src": "/wans/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/wans/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/wans/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
