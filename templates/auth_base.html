@@ -13,12 +13,13 @@
 </head>
 <body>
     <div class="auth-shell">
+        {% block aside %}
         <aside class="auth-aside">
             <a class="auth-brand text-white mb-5 text-decoration-none" href="{{ url_for('landing') }}">
-                <span class="auth-logo"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></span>
+                <span class="auth-logo" style="width:74px;height:74px;border-radius:22px;padding:6px;"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></span>
                 <span class="lh-sm">
-                    <span class="d-block fw-bolder" style="font-size:2rem;letter-spacing:-.03em;">{{ PRODUCT_NAME }}</span>
-                    <span class="d-block" style="font-size:.78rem;opacity:.7;letter-spacing:.14em;text-transform:uppercase;">wanland planner</span>
+                    <span class="d-block fw-bolder brand-text-glow" style="font-size:2.6rem;letter-spacing:-.04em;line-height:1;">{{ PRODUCT_NAME }}</span>
+                    <span class="d-block" style="font-size:.8rem;opacity:.72;letter-spacing:.16em;text-transform:uppercase;margin-top:.2rem;">wanland planner</span>
                 </span>
             </a>
             <div class="mb-4">
@@ -33,6 +34,7 @@
             </div>
             <div class="small opacity-50">© {{ current_year }} {{ PRODUCT_NAME }}</div>
         </aside>
+{% endblock %}
         <main class="auth-main">
             <div class="auth-card">
                 {% with messages = get_flashed_messages(with_categories=true) %}

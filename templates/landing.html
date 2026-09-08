@@ -1,21 +1,21 @@
 {% extends "auth_base.html" %}
 {% block title %}Welcome{% endblock %}
+{% block aside %}{% endblock %}
 {% block content %}
-<div class="text-center my-3">
-    <div class="auth-logo mx-auto mb-3 d-lg-none" style="width:64px;height:64px;padding:6px;"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></div>
+<div class="text-center py-3">
     <div class="landing-logo mx-auto mb-4"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></div>
-    <h1 class="mb-1 fw-bolder" style="font-size:3.25rem;letter-spacing:-.04em;">{{ PRODUCT_NAME }}</h1>
-    <p class="small text-muted text-uppercase mb-3" style="letter-spacing:.14em;">wanland planner</p>
-    <p class="lead mx-auto" style="max-width: 34ch;">The inventory system for small businesses. Track products, sales, customers, expenses and profits — in one place.</p>
-    <div class="d-flex gap-2 justify-content-center mt-4">
+    <h1 class="landing-title mb-1">{{ PRODUCT_NAME }}</h1>
+    <p class="small text-muted text-uppercase mb-3" style="letter-spacing:.16em;">wanland planner</p>
+    <p class="lead mx-auto mb-4" style="max-width: 34ch;">The inventory system for small businesses. Track products, sales, customers, expenses and profits — in one place.</p>
+    <div class="d-flex gap-2 justify-content-center mb-4">
         <a href="{{ url_for('signup') }}" class="btn btn-brand btn-lg px-4"><i class="bi bi-rocket-takeoff me-1"></i>Start free</a>
         <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4"><i class="bi bi-box-arrow-in-right me-1"></i>Login</a>
     </div>
-    <div class="row g-3 mt-4 text-center">
-        <div class="col-3"><div class="feature-tile border-0 py-3"><i class="bi bi-box-seam"></i><p class="fw-semibold mb-0">Inventory</p></div></div>
-        <div class="col-3"><div class="feature-tile border-0 py-3"><i class="bi bi-cart"></i><p class="fw-semibold mb-0">Sales</p></div></div>
-        <div class="col-3"><div class="feature-tile border-0 py-3"><i class="bi bi-people"></i><p class="fw-semibold mb-0">Customers</p></div></div>
-        <div class="col-3"><div class="feature-tile border-0 py-3"><i class="bi bi-graph-up"></i><p class="fw-semibold mb-0">Reports</p></div></div>
+    <div class="row g-2 g-md-3 mt-3 text-center">
+        <div class="col-3"><div class="landing-tile"><i class="bi bi-box-seam"></i><p class="fw-semibold mb-0">Inventory</p></div></div>
+        <div class="col-3"><div class="landing-tile"><i class="bi bi-cart"></i><p class="fw-semibold mb-0">Sales</p></div></div>
+        <div class="col-3"><div class="landing-tile"><i class="bi bi-people"></i><p class="fw-semibold mb-0">Customers</p></div></div>
+        <div class="col-3"><div class="landing-tile"><i class="bi bi-graph-up"></i><p class="fw-semibold mb-0">Reports</p></div></div>
     </div>
 </div>
 {% endblock %}

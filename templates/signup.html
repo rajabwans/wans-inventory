@@ -1,8 +1,12 @@
 {% extends "auth_base.html" %}
 {% block title %}Sign up{% endblock %}
 {% block content %}
+<div class="text-center mb-4 d-lg-none">
+    <div class="auth-logo mx-auto mb-2" style="width:76px;height:76px;padding:7px;border-radius:20px;"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}"></div>
+    <div class="fw-bolder" style="font-size:2.1rem;line-height:1;letter-spacing:-.04em;">{{ PRODUCT_NAME }}</div>
+    <div class="small text-muted text-uppercase" style="letter-spacing:.16em;">wanland planner</div>
+</div>
 <div class="text-center mb-4">
-    <div class="auth-logo mx-auto mb-3 d-lg-none"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}"></div>
     <h2 class="mb-1">Create your workspace</h2>
     <p class="lead mb-0">Set up your business in under a minute</p>
 </div>
