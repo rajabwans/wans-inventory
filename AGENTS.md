@@ -125,11 +125,13 @@ itself is called WANPLAN.
 - Strategy: navigations = network-first (cached copy under key `/wanplan-shell` reused offline); same-origin
   static = stale-while-revalidate; CDN (jsdelivr/fonts) = stale-while-revalidate; final offline fallback =
   `static/offline.html`. Registration snippet in both base templates (`scope:'/wans/'`).
-- Bump `VERSION` in `sw.js` when the precache list changes. Currently `wanplan-v5`.
+- Bump `VERSION` in `sw.js` when the precache list changes. Currently `wanplan-v6`.
+- **Bootstrap is vendored locally** at `static/vendor/bootstrap/` and `static/vendor/bootstrap-icons/`
+  (JS bundle, CSS, woff/woff2). Templates + sw.js PRECACHE use the local copies — NO CDN dependency.
+  This is how the hamburger/dropdowns work reliably offline.
 - **Nav on mobile**: topnav must use `min-height` (NOT fixed `height`) so the hamburger
-  collapse grows cleanly; `bootstrap.bundle.min.js` and `offline.js` are precached so the
-  menu/dropdowns work offline — was "glitching" because the JS bundle wasn't cached and the
-  fixed-height nav overflowed over the page content.
+  collapse grows cleanly; the mobile menu is its own scrollable panel (`max-height` +
+  `overflow-y`) and `backdrop-filter` is off on small screens to avoid rendering flicker.
 
 ## Offline mode (Quick Sell)
 - Route `/offline` (login_required) → `templates/offline_page.html` + `static/offline.js`.
