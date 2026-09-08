@@ -29,11 +29,9 @@
                             <label class="form-label">Category</label>
                             <select name="category" class="form-select">
                                 <option value="">Select category...</option>
-                                <option>Perfumes</option>
-                                <option>Scented Oils</option>
-                                <option>Toys</option>
-                                <option>Womens Bags</option>
-                                <option>Suitcases</option>
+                                {% for c in categories %}
+                                <option>{{ c.name }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-4">

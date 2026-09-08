@@ -99,7 +99,8 @@ def inject_globals():
                 TENANT_SLUG=biz.get('slug') or '',
                 CURRENT_PLAN=get_effective_plan(),
                 PAYMENT_PHONE=PAYMENT_PHONE,
-                PRO_PRICE=PRO_PRICE)
+                PRO_PRICE=PRO_PRICE,
+                current_year=date.today().year)
 
 if IS_PG:
     import psycopg2
@@ -191,9 +192,18 @@ SCHEMA_SQLITE = '''
     );
     CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL DEFAULT 1,
         user_id INTEGER, username TEXT, action TEXT NOT NULL,
         table_name TEXT NOT NULL, record_id INTEGER, details TEXT,
         ip_address TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'product',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(business_id, kind, name)
     );
 '''
 
@@ -256,6 +266,12 @@ SCHEMA_PG = '''
         table_name TEXT NOT NULL, record_id INTEGER,
         details TEXT, ip_address TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS categories (
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'product',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(business_id, kind, name)
+    );
 '''
 
 MIGRATION_SQLITE = [
@@ -268,6 +284,7 @@ MIGRATION_SQLITE = [
     "ALTER TABLE expenses ADD COLUMN business_id INTEGER DEFAULT 1",
     "ALTER TABLE stock_adjustments ADD COLUMN business_id INTEGER DEFAULT 1",
     "ALTER TABLE audit_log ADD COLUMN business_id INTEGER DEFAULT 1",
+    "ALTER TABLE users ADD COLUMN business_id INTEGER DEFAULT 1",
     "ALTER TABLE businesses ADD COLUMN status TEXT DEFAULT 'pending'",
     "ALTER TABLE businesses ADD COLUMN paid_until TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN upgrade_requested INTEGER DEFAULT 0",
@@ -349,9 +366,30 @@ def create_default_admin():
         print(f'[ADMIN INIT ERROR] {e}', file=sys.stderr)
     db_close(conn)
 
+DEFAULT_PRODUCT_CATEGORIES = ['Perfumes', 'Scented Oils', 'Toys', 'Womens Bags', 'Suitcases']
+DEFAULT_EXPENSE_CATEGORIES = ['Rent', 'Utilities', 'Transport', 'Salaries', 'Marketing', 'Other']
+
+def seed_default_categories():
+    conn = get_db()
+    try:
+        for bid, names, kind in [(1, DEFAULT_PRODUCT_CATEGORIES, 'product'),
+                                 (1, DEFAULT_EXPENSE_CATEGORIES, 'expense')]:
+            for name in names:
+                exists = query(conn, 'SELECT id FROM categories WHERE business_id = ? AND kind = ? AND name = ?',
+                               (bid, kind, name)).fetchone()
+                if not exists:
+                    query(conn, 'INSERT INTO categories (business_id, name, kind) VALUES (?,?,?)',
+                          (bid, name, kind))
+        db_commit(conn)
+        print('[INFO] Default categories seeded', file=sys.stderr)
+    except Exception as e:
+        print(f'[CATEGORY INIT ERROR] {e}', file=sys.stderr)
+    db_close(conn)
+
 init_db()
 create_default_business()
 create_default_admin()
+seed_default_categories()
 
 def login_required(f):
     @wraps(f)
@@ -628,6 +666,55 @@ def dashboard():
                            category_breakdown=category_breakdown, top_products=top_products,
                            total_customers=total_customers)
 
+@app.route('/categories', methods=['GET', 'POST'])
+@admin_required
+def categories():
+    conn = get_db()
+    bid = get_business_id()
+    kind = sanitize_input(request.form.get('kind', ''))
+    if request.method == 'POST':
+        name = sanitize_input(request.form.get('name', '')).strip()
+        if kind not in ('product', 'expense'):
+            flash('Invalid category type', 'danger')
+        elif not name:
+            flash('Category name is required', 'danger')
+        else:
+            exists = query(conn, 'SELECT id FROM categories WHERE business_id = ? AND kind = ? AND name = ?',
+                           (bid, kind, name)).fetchone()
+            if exists:
+                flash(f'Category "{name}" already exists', 'warning')
+            else:
+                query(conn, 'INSERT INTO categories (business_id, name, kind) VALUES (?,?,?)',
+                      (bid, name, kind))
+                db_commit(conn)
+                log_audit(conn, 'create', 'categories', None, f'Added {kind} category: {name}')
+                flash(f'Category "{name}" added', 'success')
+        db_close(conn)
+        return redirect(url_for('categories'))
+    product_cats = query(conn, 'SELECT * FROM categories WHERE business_id = ? AND kind = ? ORDER BY lower(name)', (bid, 'product')).fetchall()
+    expense_cats = query(conn, 'SELECT * FROM categories WHERE business_id = ? AND kind = ? ORDER BY lower(name)', (bid, 'expense')).fetchall()
+    db_close(conn)
+    return render_template('categories.html', product_cats=product_cats, expense_cats=expense_cats)
+
+@app.route('/categories/delete/<int:id>', methods=['POST'])
+@admin_required
+def delete_category(id):
+    conn = get_db()
+    bid = get_business_id()
+    try:
+        cat = query(conn, 'SELECT * FROM categories WHERE id = ? AND business_id = ?', (id, bid)).fetchone()
+        if not cat:
+            flash('Category not found', 'danger')
+        else:
+            query(conn, 'DELETE FROM categories WHERE id = ? AND business_id = ?', (id, bid))
+            db_commit(conn)
+            log_audit(conn, 'delete', 'categories', id, f'Removed {cat["kind"]} category: {cat["name"]}')
+            flash(f'Category "{cat["name"]}" removed', 'success')
+    except Exception as e:
+        flash(f'Error removing category: {e}', 'danger')
+    db_close(conn)
+    return redirect(url_for('categories'))
+
 @app.route('/products')
 @login_required
 def products():
@@ -676,7 +763,11 @@ def add_product():
             flash(f'Error adding product: {e}', 'danger')
         db_close(conn)
         return redirect(url_for('products'))
-    return render_template('add_product.html')
+    conn = get_db()
+    bid = get_business_id()
+    cats = query(conn, 'SELECT name FROM categories WHERE business_id = ? AND kind = ? ORDER BY lower(name)', (bid, 'product')).fetchall()
+    db_close(conn)
+    return render_template('add_product.html', categories=cats)
 
 @app.route('/products/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -726,8 +817,9 @@ def edit_product(id):
             flash(f'Error updating product: {e}', 'danger')
         db_close(conn)
         return redirect(url_for('products'))
+    cats = query(conn, 'SELECT name FROM categories WHERE business_id = ? AND kind = ? ORDER BY lower(name)', (bid, 'product')).fetchall()
     db_close(conn)
-    return render_template('edit_product.html', product=product)
+    return render_template('edit_product.html', product=product, categories=cats)
 
 @app.route('/products/delete/<int:id>', methods=['POST'])
 @login_required
@@ -923,7 +1015,11 @@ def add_expense():
             flash(f'Error adding expense: {e}', 'danger')
         db_close(conn)
         return redirect(url_for('expenses'))
-    return render_template('add_expense.html')
+    conn = get_db()
+    bid = get_business_id()
+    cats = query(conn, 'SELECT name FROM categories WHERE business_id = ? AND kind = ? ORDER BY lower(name)', (bid, 'expense')).fetchall()
+    db_close(conn)
+    return render_template('add_expense.html', categories=cats)
 
 @app.route('/expenses/delete/<int:id>', methods=['POST'])
 @login_required

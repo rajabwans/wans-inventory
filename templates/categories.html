@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Categories{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-0"><i class="bi bi-tags"></i> Categories</h4>
+        <p class="text-muted small mb-0">Define what you sell and where money goes — your categories, your way.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong><i class="bi bi-box-seam"></i> Product Categories</strong>
+                <span class="badge bg-primary">{{ product_cats|length }}</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="mb-3 d-flex gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="kind" value="product"/>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. Shoes, Electronics, Stationery..." required>
+                    <button type="submit" class="btn btn-dark text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
+                </form>
+                {% if product_cats %}
+                <ul class="list-group">
+                    {% for c in product_cats %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-tag me-2 text-primary"></i>{{ c.name }}</span>
+                        <form method="POST" action="{{ url_for('delete_category', id=c.id) }}" class="d-inline" onsubmit="return confirm('Remove "{{ c.name }}"?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0 text-center py-3"><i class="bi bi-inbox"></i> No product categories yet. Add your first one above.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong><i class="bi bi-receipt"></i> Expense Categories</strong>
+                <span class="badge bg-primary">{{ expense_cats|length }}</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="mb-3 d-flex gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="kind" value="expense"/>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. Rent, Transport, Salaries..." required>
+                    <button type="submit" class="btn btn-dark text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
+                </form>
+                {% if expense_cats %}
+                <ul class="list-group">
+                    {% for c in expense_cats %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-tag me-2 text-success"></i>{{ c.name }}</span>
+                        <form method="POST" action="{{ url_for('delete_category', id=c.id) }}" class="d-inline" onsubmit="return confirm('Remove "{{ c.name }}"?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0 text-center py-3"><i class="bi bi-inbox"></i> No expense categories yet. Add your first one above.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-light border mt-3 small">
+    <i class="bi bi-info-circle me-1"></i>
+    These categories appear in your product and expense forms. Businesses manage their own lists — free to edit anytime.
+</div>
+{% endblock %}

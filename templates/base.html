@@ -4,81 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ COMPANY_NAME }} - {% block title %}Inventory{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     {% if session.user_id %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}">
-                {% if session.biz and session.biz.logo %}<img src="{{ session.biz.logo }}" alt="logo" style="height:28px; width:28px; object-fit:contain;" class="me-1">{% else %}<i class="bi bi-building"></i>{% endif %} {{ COMPANY_NAME }}
+    <nav class="topnav navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid px-3">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <span class="brand-mark">{% if session.biz and session.biz.logo %}<img src="{{ session.biz.logo }}" alt="logo" class="img-fluid" style="height:22px;width:22px;object-fit:contain;">{% else %}<i class="bi bi-box2-fill"></i>{% endif %}</span>
+                {{ COMPANY_NAME }}
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('products') }}"><i class="bi bi-box-seam"></i> Products</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('sales') }}"><i class="bi bi-cart"></i> Sales</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}"><i class="bi bi-people"></i> Customers</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('expenses') }}"><i class="bi bi-receipt"></i> Expenses</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('billing') }}"><i class="bi bi-credit-card"></i> Billing</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('products') }}"><i class="bi bi-box-seam"></i>Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('sales') }}"><i class="bi bi-cart"></i>Sales</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}"><i class="bi bi-people"></i>Customers</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('expenses') }}"><i class="bi bi-receipt"></i>Expenses</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('billing') }}"><i class="bi bi-credit-card"></i>Billing</a></li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-file-earmark-bar-graph"></i>Reports</a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('stock_report') }}"><i class="bi bi-box-seam"></i> Stock Valuation</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('sales_report') }}"><i class="bi bi-graph-up"></i> Sales Report</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('pnl_report') }}"><i class="bi bi-cash-stack"></i> Profit & Loss</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('stock_report') }}"><i class="bi bi-box-seam"></i>Stock Valuation</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('sales_report') }}"><i class="bi bi-graph-up"></i>Sales Report</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('pnl_report') }}"><i class="bi bi-cash-stack"></i>Profit & Loss</a></li>
                         </ul>
                     </li>
-                    {% if session.role == 'admin' %}
+                    {% if session.role in ('admin', 'superadmin') %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i> Admin</a>
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i>Admin</a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('manage_business') }}"><i class="bi bi-building-gear"></i> Business Settings</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('manage_users') }}"><i class="bi bi-people-fill"></i> Users</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('stock_adjustments') }}"><i class="bi bi-arrow-left-right"></i> Stock Adjustments</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('audit_log') }}"><i class="bi bi-journal-text"></i> Audit Log</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('manage_business') }}"><i class="bi bi-building-gear"></i>Business Settings</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('categories') }}"><i class="bi bi-tags"></i>Categories</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('manage_users') }}"><i class="bi bi-people-fill"></i>Users</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('stock_adjustments') }}"><i class="bi bi-arrow-left-right"></i>Stock Adjustments</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('audit_log') }}"><i class="bi bi-journal-text"></i>Audit Log</a></li>
                         </ul>
                     </li>
                     {% endif %}
                     {% if session.role == 'superadmin' %}
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('platform') }}"><i class="bi bi-globe2"></i> All Businesses</a></li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i> Admin</a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('manage_business') }}"><i class="bi bi-building-gear"></i> Business Settings</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('manage_users') }}"><i class="bi bi-people-fill"></i> Users</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('stock_adjustments') }}"><i class="bi bi-arrow-left-right"></i> Stock Adjustments</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('audit_log') }}"><i class="bi bi-journal-text"></i> Audit Log</a></li>
-                        </ul>
-                    </li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('platform') }}"><i class="bi bi-globe2"></i>All Businesses</a></li>
                     {% endif %}
                 </ul>
-                <span class="navbar-text me-3 small">
-                    <i class="bi bi-person-circle"></i> {{ session.full_name }}
-                    <span class="badge bg-secondary ms-1">{{ session.role }}</span>
-                </span>
-                <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-light small me-1 d-none d-md-inline">
+                        <i class="bi bi-person-circle"></i> {{ session.full_name }}
+                        <span class="badge bg-secondary ms-1">{{ session.role }}</span>
+                    </span>
+                    <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a>
+                </div>
             </div>
         </div>
     </nav>
     {% endif %}
 
-    <div class="container-fluid px-4 py-3">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+    <div id="appBody">
+        <div class="container-fluid px-3 px-lg-4 py-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ COMPANY_NAME }}{% endblock %} — {{ COMPANY_NAME }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="auth-shell">
+        <aside class="auth-aside">
+            <div class="auth-brand text-white mb-5">
+                <span class="auth-logo"><i class="bi bi-box2-fill"></i></span>
+                <span>{{ COMPANY_NAME }}</span>
+            </div>
+            <div class="mb-4">
+                <h2 class="fw-bold text-white mb-3">Inventory done right.</h2>
+                <p class="opacity-75 mb-4">Manage products, sales, customers, expenses and profits — all in one clean workspace.</p>
+                <div class="row g-2">
+                    <div class="col-6"><div class="feature-tile"><i class="bi bi-box-seam"></i><p>Track stock in real time</p></div></div>
+                    <div class="col-6"><div class="feature-tile"><i class="bi bi-cart"></i><p>Record sales in seconds</p></div></div>
+                    <div class="col-6"><div class="feature-tile"><i class="bi bi-people"></i><p>Keep your customers</p></div></div>
+                    <div class="col-6"><div class="feature-tile"><i class="bi bi-graph-up"></i><p>Understand your profit</p></div></div>
+                </div>
+            </div>
+            <div class="small opacity-50">© {{ current_year }} {{ COMPANY_NAME }}</div>
+        </aside>
+        <main class="auth-main">
+            <div class="auth-card">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
