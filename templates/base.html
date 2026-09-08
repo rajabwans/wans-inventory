@@ -16,8 +16,11 @@
     <nav class="topnav navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid px-3">
             <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                <span class="brand-mark">{% if session.biz and session.biz.logo %}<img src="{{ session.biz.logo }}" alt="logo" class="img-fluid" style="height:22px;width:22px;object-fit:contain;">{% else %}<i class="bi bi-box2-fill"></i>{% endif %}</span>
-                {{ COMPANY_NAME }}
+                <span class="brand-mark">{% if session.biz and session.biz.logo %}<img src="{{ session.biz.logo }}" alt="logo" class="img-fluid" style="height:100%;width:100%;object-fit:contain;border-radius:10px;">{% else %}<img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="height:100%;width:100%;">{% endif %}</span>
+                <span class="lh-sm d-flex flex-column justify-content-center">
+                    <small style="font-size:.6rem;letter-spacing:.16em;font-weight:800;opacity:.6;text-transform:uppercase;">{{ PRODUCT_NAME }}</small>
+                    <span style="font-size:1.05rem;line-height:1.1;">{{ COMPANY_NAME }}</span>
+                </span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>

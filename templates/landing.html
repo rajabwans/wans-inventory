@@ -2,8 +2,9 @@
 {% block title %}Welcome{% endblock %}
 {% block content %}
 <div class="text-center my-3">
-    <div class="auth-logo mx-auto mb-3 d-lg-none"><i class="bi bi-box2-fill"></i></div>
-    <h1 class="mb-1 fw-bolder" style="font-size:3rem;letter-spacing:-.04em;">{{ PRODUCT_NAME }}</h1>
+    <div class="auth-logo mx-auto mb-3 d-lg-none" style="width:64px;height:64px;padding:6px;"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></div>
+    <div class="landing-logo mx-auto mb-4"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></div>
+    <h1 class="mb-1 fw-bolder" style="font-size:3.25rem;letter-spacing:-.04em;">{{ PRODUCT_NAME }}</h1>
     <p class="small text-muted text-uppercase mb-3" style="letter-spacing:.14em;">wanland planner</p>
     <p class="lead mx-auto" style="max-width: 34ch;">The inventory system for small businesses. Track products, sales, customers, expenses and profits — in one place.</p>
     <div class="d-flex gap-2 justify-content-center mt-4">

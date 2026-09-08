@@ -51,16 +51,18 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.02em; }
     gap: .55rem;
 }
 .brand-mark {
-    width: 34px; height: 34px;
-    border-radius: 10px;
+    width: 42px; height: 42px;
+    border-radius: 12px;
     background: var(--brand-grad);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #fff;
+    overflow: hidden;
     font-size: 1.05rem;
-    box-shadow: 0 4px 12px rgba(79,70,229,.4);
+    box-shadow: 0 4px 14px rgba(79,70,229,.45);
 }
+.brand-mark img { display: block; }
 .topnav .nav-link {
     color: #cbd5e1;
     font-weight: 500;
@@ -238,16 +240,19 @@ a.card:hover { transform: translateY(-2px); }
 .auth-card .lead { color: var(--muted); font-size: .95rem; }
 .auth-brand { display: flex; align-items: center; gap: .6rem; font-weight: 700; font-size: 1.1rem; }
 .auth-logo {
-    width: 42px; height: 42px;
-    border-radius: 12px;
+    width: 54px; height: 54px;
+    border-radius: 15px;
     background: #fff;
     color: #4f46e5;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: 5px;
     font-size: 1.25rem;
     box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    overflow: hidden;
 }
+.auth-logo img { display: block; }
 .feature-tile {
     background: rgba(255,255,255,.08);
     border: 1px solid rgba(255,255,255,.14);
@@ -282,16 +287,19 @@ a.card:hover { transform: translateY(-2px); }
 }
 .landing-hero > * { position: relative; z-index: 1; }
 .landing-logo {
-    width: 64px; height: 64px;
-    border-radius: 18px;
+    width: 88px; height: 88px;
+    border-radius: 24px;
     background: #fff;
     color: #4f46e5;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: 8px;
     font-size: 2rem;
-    box-shadow: 0 12px 40px rgba(0,0,0,.3);
+    box-shadow: 0 14px 44px rgba(0,0,0,.35);
+    overflow: hidden;
 }
+.landing-logo img { display: block; }
 .landing-stat i { font-size: 1.4rem; color: #fbbf24; }
 .landing-stat p { font-size: .8rem; opacity: .8; margin: .35rem 0 0; }
 

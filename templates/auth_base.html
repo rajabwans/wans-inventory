@@ -15,10 +15,10 @@
     <div class="auth-shell">
         <aside class="auth-aside">
             <a class="auth-brand text-white mb-5 text-decoration-none" href="{{ url_for('landing') }}">
-                <span class="auth-logo" style="width:56px;height:56px;font-size:1.6rem;border-radius:16px;"><i class="bi bi-box2-fill"></i></span>
+                <span class="auth-logo"><img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ PRODUCT_NAME }}" style="display:block;height:100%;width:100%;"></span>
                 <span class="lh-sm">
-                    <span class="d-block fw-bolder" style="font-size:1.75rem;letter-spacing:-.03em;">{{ PRODUCT_NAME }}</span>
-                    <span class="d-block" style="font-size:.78rem;opacity:.7;letter-spacing:.12em;text-transform:uppercase;">wanland planner</span>
+                    <span class="d-block fw-bolder" style="font-size:2rem;letter-spacing:-.03em;">{{ PRODUCT_NAME }}</span>
+                    <span class="d-block" style="font-size:.78rem;opacity:.7;letter-spacing:.14em;text-transform:uppercase;">wanland planner</span>
                 </span>
             </a>
             <div class="mb-4">
