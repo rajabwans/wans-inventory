@@ -281,6 +281,98 @@ a.card:hover { transform: translateY(-2px); }
 .page-sub { color: var(--muted); font-size: .85rem; }
 .list-group-item { border-color: var(--line); }
 
+/* ---------- Form page header ---------- */
+.form-page-header {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.3rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.form-page-header .step-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--brand-grad);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 14px rgba(79,70,229,.32);
+}
+
+/* ---------- Icon inputs ---------- */
+.input-icon-wrap { position: relative; }
+.input-icon-wrap > i {
+    position: absolute;
+    left: .85rem; top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: .95rem;
+    pointer-events: none;
+    z-index: 2;
+}
+.input-icon-wrap .form-control,
+.input-icon-wrap .form-select { padding-left: 2.5rem; }
+.input-icon-wrap.currency .form-control { padding-left: 4.7rem; }
+.input-currency-prefix {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-weight: 600;
+    font-size: .82rem;
+    border-right: 1.5px solid var(--line);
+    background: #f8fafc;
+    border-radius: 10px 0 0 10px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* ---------- Field label pills ---------- */
+.field-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: .35rem;
+}
+
+/* ---------- Margin preview ---------- */
+.margin-banner {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    border-radius: 12px;
+    padding: .9rem 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+.margin-banner.negative { background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-color: #fecaca; color: #991b1b; }
+.margin-banner .value { font-weight: 800; font-size: 1.15rem; }
+.margin-banner .hint { font-size: .78rem; opacity: .8; }
+.margin-dot {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: #16a34a;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.margin-banner.negative .margin-dot { background: #dc2626; }
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
