@@ -1,7 +1,9 @@
-import os, sys, csv, io, re, secrets
+import os, sys, csv, io, re, secrets, smtplib
 import sqlite3
 from functools import wraps
 from datetime import date, datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, session, send_file, send_from_directory, abort, g)
 from flask_wtf import CSRFProtect
@@ -48,6 +50,12 @@ CURRENCY = os.environ.get('CURRENCY', 'UGX')
 PAYMENT_PHONE = os.environ.get('PAYMENT_PHONE', '0763750114')
 PRO_PRICE = os.environ.get('PRO_PRICE', 'UGX 15,000 / month')
 TRIAL_DAYS = int(os.environ.get('TRIAL_DAYS', '7'))
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASS = os.environ.get('SMTP_PASS', '')
+NOTIFY_EMAIL = os.environ.get('NOTIFY_EMAIL', 'wanandarajab@gmail.com')
+APP_URL = os.environ.get('APP_URL', 'https://jarvis.wanland.org/wans')
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inventory.db'))
 
 IS_PG = bool(DATABASE_URL)
@@ -1696,6 +1704,36 @@ def _delete_proof_file(name):
     except Exception:
         pass
 
+def send_upgrade_notification(name, slug, ref='', proof=''):
+    try:
+        if not SMTP_USER or not SMTP_PASS or not NOTIFY_EMAIL:
+            print(f'[notify] SMTP not configured, skipped upgrade alert for {name}', file=sys.stderr)
+            return
+        subject = f'{PRODUCT_NAME} upgrade request — {name} ({slug})'
+        body = (
+            f'A tenant has requested a Pro upgrade.\n\n'
+            f'Business: {name}\n'
+            f'Slug: {slug}\n'
+            f'Transaction ref / note: {ref or "(none)"}\n'
+            f'Proof image: {proof or "(none)"}\n\n'
+            f'Review it here: {APP_URL}/platform'
+        )
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = SMTP_USER or NOTIFY_EMAIL
+        msg['To'] = NOTIFY_EMAIL
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as srv:
+            srv.ehlo()
+            if srv.has_extn('starttls'):
+                srv.starttls()
+                srv.ehlo()
+            srv.login(SMTP_USER, SMTP_PASS)
+            srv.send_message(msg)
+        print(f'[notify] upgrade alert emailed to {NOTIFY_EMAIL} for {name}', file=sys.stderr)
+    except Exception as e:
+        print(f'[notify] email failed for {name}: {e}', file=sys.stderr)
+
 @app.route('/billing/request-upgrade', methods=['POST'])
 @login_required
 def request_upgrade():
@@ -1730,6 +1768,10 @@ def request_upgrade():
                         WHERE id = ?''', (note or None, proof_name, bid))
         db_commit(conn)
         log_audit(conn, 'upgrade', 'businesses', bid, f'Requested pro upgrade. Note: {note or "none"}, proof: {proof_name or "none"}')
+        brow = query(conn, 'SELECT name, slug FROM businesses WHERE id = ?', (bid,)).fetchone()
+        send_upgrade_notification(brow['name'] if brow else f'Business #{bid}',
+                                  brow['slug'] if brow else '?',
+                                  note or '', proof_name or '')
         flash('Upgrade request sent to the administrator with your payment details.', 'success')
     except Exception as e:
         flash(f'Error: {e}', 'danger')
