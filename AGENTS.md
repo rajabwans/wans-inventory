@@ -115,6 +115,26 @@ itself is called WANPLAN.
 - Recovery = `total_cogs / (total_cogs + total_invested) * 100`, clamped to 0–100%.
   Old formula divided by stock value only and produced absurd numbers (900%).
 
+## PWA (installable app + offline)
+- Full PWA: `static/manifest.webmanifest`, `static/sw.js`, `static/offline.html`, generated PNG icons.
+- Manifest start_url/scope = `/wans/`, theme-color `#4338ca`, `display: standalone` (phone + desktop install).
+- Icons (drawn with Pillow via `/tmp/gen_icons.py`, supersampled x6): `icon-192/512.png` (rounded tile),
+  `icon-maskable-512.png` (full-bleed, safe zone), `apple-touch-icon.png` 180, `favicon.png` 32.
+- `/wans/sw.js` route (Flask `sw()`) serves the worker WITH `Service-Worker-Allowed: /wans/` so the wider
+  scope works; `/wans/manifest.webmanifest` route forces `application/manifest+json`.
+- Strategy: navigations = network-first (cached copy under key `/wanplan-shell` reused offline); same-origin
+  static = stale-while-revalidate; CDN (jsdelivr/fonts) = stale-while-revalidate; final offline fallback =
+  `static/offline.html`. Registration snippet in both base templates (`scope:'/wans/'`).
+- Bump `VERSION` in `sw.js` when the precache list changes.
+
+## Email upgrade notifications
+- `send_upgrade_notification(name, slug, ref, proof)` in app.py emails `NOTIFY_EMAIL`
+  (default `wanandarajab@gmail.com`) on every `/billing/request-upgrade`.
+- Config via env: `SMTP_HOST/`SMTP_PORT/`SMTP_USER/`SMTP_PASS/`NOTIFY_EMAIL/`APP_URL`.
+  Gmail needs an App Password (2-Step Verification + google.com/apppasswords).
+- If `SMTP_USER`/`SMTP_PASS` unset it just logs `[notify]` and does NOT fail the request —
+  so the feature is dormant until creds are added to the VPS `.env` (NOT committed).
+
 ## Deploy (VPS)
 - VPS: `ubuntu@92.4.141.94`, SSH key `$HOME/Downloads/vps.key`
   (`ssh -i ~/Downloads/vps.key ubuntu@92.4.141.94`).
