@@ -42,6 +42,8 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["500 per day"])
 
 PASSWORD = os.environ.get('APP_PASSWORD', 'wans123')
 COMPANY_NAME = os.environ.get('COMPANY_NAME', 'WANS COLLECTION')
+PRODUCT_NAME = os.environ.get('PRODUCT_NAME', 'WANPLAN')
+PAYMENT_NAME = os.environ.get('PAYMENT_NAME', COMPANY_NAME)
 CURRENCY = os.environ.get('CURRENCY', 'UGX')
 PAYMENT_PHONE = os.environ.get('PAYMENT_PHONE', '0763750114')
 PRO_PRICE = os.environ.get('PRO_PRICE', 'UGX 15,000 / month')
@@ -99,13 +101,15 @@ def block_suspended():
         allowed = ('logout', 'static', 'billing', 'request_upgrade', 'platform', 'serve_upload')
         if status == 'active' and session.get('role') != 'superadmin' \
                 and get_effective_plan() == 'expired' and request.endpoint not in allowed:
-            flash('Your free trial has ended. Activate Pro to continue using Wans Plan.', 'warning')
+            flash('Your free trial has ended. Activate Pro to continue using WanPlan.', 'warning')
             return redirect(url_for('billing'))
 
 @app.context_processor
 def inject_globals():
     biz = session.get('biz', {})
     return dict(COMPANY_NAME=biz.get('name') or COMPANY_NAME,
+                PRODUCT_NAME=PRODUCT_NAME,
+                PAYMENT_NAME=PAYMENT_NAME,
                 CURRENCY=biz.get('currency') or CURRENCY,
                 TENANT_SLUG=biz.get('slug') or '',
                 CURRENT_PLAN=get_effective_plan(),

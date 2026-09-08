@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ COMPANY_NAME }}{% endblock %} — {{ COMPANY_NAME }}</title>
+    <title>{% block title %}{{ PRODUCT_NAME }}{% endblock %} — {{ PRODUCT_NAME }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
         <aside class="auth-aside">
             <div class="auth-brand text-white mb-5">
                 <span class="auth-logo"><i class="bi bi-box2-fill"></i></span>
-                <span>{{ COMPANY_NAME }}</span>
+                <span class="lh-sm"><span class="d-block fw-bold">{{ PRODUCT_NAME }}</span><span class="d-block" style="font-size:.8rem;opacity:.7;letter-spacing:.05em;text-transform:uppercase;">wanland planner</span></span>
             </div>
             <div class="mb-4">
                 <h2 class="fw-bold text-white mb-3">Inventory done right.</h2>
@@ -28,7 +28,7 @@
                     <div class="col-6"><div class="feature-tile"><i class="bi bi-graph-up"></i><p>Understand your profit</p></div></div>
                 </div>
             </div>
-            <div class="small opacity-50">© {{ current_year }} {{ COMPANY_NAME }}</div>
+            <div class="small opacity-50">© {{ current_year }} {{ PRODUCT_NAME }}</div>
         </aside>
         <main class="auth-main">
             <div class="auth-card">
