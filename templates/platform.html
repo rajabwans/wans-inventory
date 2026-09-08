@@ -36,7 +36,12 @@
                         {% elif b['status'] == 'suspended' %}<span class="badge bg-danger">Suspended</span>
                         {% else %}<span class="badge bg-secondary">Rejected</span>{% endif %}
                     </td>
-                    <td><span class="badge {% if b['plan']=='pro' %}bg-primary{% else %}bg-light text-dark border{% endif %}">{{ b['plan'] or 'free' }}</span></td>
+                    <td>
+                        {% set st = biz_plan_state(b) %}
+                        {% if st == 'pro' %}<span class="badge bg-primary">Pro</span>
+                        {% elif st == 'trial' %}<span class="badge bg-info text-dark">Trial <small>until {{ (b['trial_ends_at'] or '')[:10] }}</small></span>
+                        {% else %}<span class="badge bg-danger">Expired</span>{% endif %}
+                    </td>
                     <td>
                         {% if b['plan']=='pro' %}
                             {{ (b['paid_until'] or 'never')[:10] if b['paid_until'] else 'never' }}
@@ -67,7 +72,7 @@
                                             <div class="mb-2">
                                                 <label class="form-label small fw-bold">Plan</label>
                                                 <select name="plan" class="form-select">
-                                                    <option value="free" {% if b['plan']!='pro' %}selected{% endif %}>Free</option>
+                                                    <option value="free" {% if b['plan']!='pro' %}selected{% endif %}>Trial (7 days)</option>
                                                     <option value="pro" {% if b['plan']=='pro' %}selected{% endif %}>Pro (unlimited)</option>
                                                 </select>
                                             </div>
@@ -75,7 +80,7 @@
                                                 <label class="form-label small fw-bold">Paid until (date)</label>
                                                 <input type="date" name="paid_until" class="form-control" value="{{ (b['paid_until'] or '')[:10] }}">
                                             </div>
-                                            <div class="form-text">Empty paid-until = never expires (lifetime). Pro plan counts as active while paid.</div>
+                                            <div class="form-text">Empty paid-until = never expires (lifetime). Pro plan counts as active while paid. Non-Pro businesses get a 7-day trial from approval, then lock until they pay.</div>
                                         </div>
                                         <div class="modal-footer"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
                                     </form>

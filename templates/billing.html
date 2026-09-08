@@ -9,8 +9,10 @@
     <div class="col-md-4">
         <div class="card shadow h-100 {% if plan=='pro' %}border-primary{% endif %}">
             <div class="card-body text-center">
-                <i class="bi {% if plan=='pro' %}bi-stars{% else %}bi-box{% endif %} display-4 text-primary"></i>
-                <h3 class="fw-bold mt-2 text-capitalize">{{ plan }} plan</h3>
+                <i class="bi {% if plan=='pro' %}bi-stars{% elif plan=='trial' %}bi-clock{% else %}bi-lock{% endif %} display-4 {{ 'text-primary' if plan=='pro' else 'text-warning' if plan=='trial' else 'text-danger' }}"></i>
+                <h3 class="fw-bold mt-2 text-capitalize">
+                    {% if plan == 'pro' %}Pro{% elif plan == 'trial' %}Free trial{% else %}Trial ended{% endif %}
+                </h3>
                 <p class="text-muted small mb-1">{{ biz['name'] }}</p>
                 {% if plan == 'pro' %}
                     {% if biz['paid_until'] %}
@@ -18,8 +20,11 @@
                     {% else %}
                         <span class="badge bg-primary">Lifetime</span>
                     {% endif %}
+                {% elif plan == 'trial' %}
+                    {% set t = biz['trial_ends_at'] %}
+                    <span class="badge bg-warning text-dark">Trial ends {{ t[:10] if t is string else t.strftime('%Y-%m-%d') }}</span>
                 {% else %}
-                    <span class="badge bg-warning text-dark">Free tier</span>
+                    <span class="badge bg-danger">Locked — reactivate to continue</span>
                 {% endif %}
                 <hr>
                 <form method="POST" action="{{ url_for('request_upgrade') }}">

@@ -40,7 +40,8 @@ PASSWORD = os.environ.get('APP_PASSWORD', 'wans123')
 COMPANY_NAME = os.environ.get('COMPANY_NAME', 'WANS COLLECTION')
 CURRENCY = os.environ.get('CURRENCY', 'UGX')
 PAYMENT_PHONE = os.environ.get('PAYMENT_PHONE', '0763750114')
-PRO_PRICE = os.environ.get('PRO_PRICE', "")  # e.g. "UGX 20,000 / month"
+PRO_PRICE = os.environ.get('PRO_PRICE', 'UGX 15,000 / month')
+TRIAL_DAYS = int(os.environ.get('TRIAL_DAYS', '7'))
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inventory.db'))
 
 IS_PG = bool(DATABASE_URL)
@@ -71,6 +72,7 @@ def refresh_biz():
                     session['biz']['plan'] = biz['plan'] or 'free'
                     session['biz']['status'] = biz['status']
                     session['biz']['paid_until'] = biz['paid_until']
+                    session['biz']['trial_ends_at'] = biz['trial_ends_at']
                     session['biz']['name'] = biz['name']
                     session['biz']['currency'] = biz['currency']
                     session['biz']['logo'] = biz['logo']
@@ -90,6 +92,11 @@ def block_suspended():
             return redirect(url_for('login'))
         if status == 'pending' and request.endpoint not in ('logout', 'static'):
             return render_template('error.html', error='Your business is still awaiting approval.'), 403
+        allowed = ('logout', 'static', 'billing', 'request_upgrade', 'platform')
+        if status == 'active' and session.get('role') != 'superadmin' \
+                and get_effective_plan() == 'expired' and request.endpoint not in allowed:
+            flash('Your free trial has ended. Activate Pro to continue using Wans Plan.', 'warning')
+            return redirect(url_for('billing'))
 
 @app.context_processor
 def inject_globals():
@@ -100,6 +107,7 @@ def inject_globals():
                 CURRENT_PLAN=get_effective_plan(),
                 PAYMENT_PHONE=PAYMENT_PHONE,
                 PRO_PRICE=PRO_PRICE,
+                biz_plan_state=biz_plan_state,
                 current_year=date.today().year)
 
 if IS_PG:
@@ -142,6 +150,7 @@ SCHEMA_SQLITE = '''
         currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
         plan TEXT DEFAULT 'free', status TEXT DEFAULT 'pending',
         paid_until TIMESTAMP, upgrade_requested INTEGER DEFAULT 0,
+        trial_ends_at TIMESTAMP,
         is_active INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -214,6 +223,7 @@ SCHEMA_PG = '''
         currency TEXT DEFAULT 'UGX', logo TEXT, about TEXT,
         plan TEXT DEFAULT 'free', status TEXT DEFAULT 'pending',
         paid_until TIMESTAMP, upgrade_requested BOOLEAN DEFAULT FALSE,
+        trial_ends_at TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -288,6 +298,7 @@ MIGRATION_SQLITE = [
     "ALTER TABLE businesses ADD COLUMN status TEXT DEFAULT 'pending'",
     "ALTER TABLE businesses ADD COLUMN paid_until TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN upgrade_requested INTEGER DEFAULT 0",
+    "ALTER TABLE businesses ADD COLUMN trial_ends_at TIMESTAMP",
 ]
 
 MIGRATION_PG = [
@@ -304,6 +315,7 @@ MIGRATION_PG = [
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'",
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP",
     "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS upgrade_requested BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP",
 ]
 
 def init_db():
@@ -435,31 +447,54 @@ def get_business_id():
     return session.get('biz', {}).get('id') or session.get('business_id') or 1
 
 PLAN_LIMITS = {
-    'free': {'products': 50, 'users': 2, 'customers': 100},
+    'trial': {'products': 50, 'users': 2, 'customers': 100},
     'pro': {'products': None, 'users': None, 'customers': None},
+    'expired': {'products': 0, 'users': 0, 'customers': 0},
 }
+
+def _parse_date(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value[:19], '%Y-%m-%d %H:%M:%S').date()
+        except Exception:
+            return datetime.strptime(value[:10], '%Y-%m-%d').date()
+    return value.date() if hasattr(value, 'date') else value
 
 def get_effective_plan():
     biz = session.get('biz', {})
     plan = biz.get('plan') or 'free'
     if plan == 'pro':
         paid_until = biz.get('paid_until')
-        if paid_until:
-            try:
-                if isinstance(paid_until, str):
-                    exp = datetime.strptime(paid_until[:10], '%Y-%m-%d').date()
-                else:
-                    exp = paid_until.date() if hasattr(paid_until, 'date') else paid_until
-                if date.today() > exp:
-                    return 'free'
-            except Exception:
-                return 'free'
+        exp = _parse_date(paid_until)
+        if exp and date.today() > exp:
+            return 'expired'
         return 'pro'
-    return 'free'
+    trial_end = _parse_date(biz.get('trial_ends_at'))
+    if trial_end and date.today() <= trial_end:
+        return 'trial'
+    return 'expired'
+
+def biz_plan_state(biz):
+    """Best-effort plan state for a raw businesses row (used by platform)."""
+    try:
+        plan = biz['plan'] or 'free'
+        if plan == 'pro':
+            exp = _parse_date(biz['paid_until'])
+            if exp and date.today() > exp:
+                return 'expired'
+            return 'pro'
+        trial_end = _parse_date(biz['trial_ends_at'])
+        if trial_end and date.today() <= trial_end:
+            return 'trial'
+        return 'expired'
+    except (TypeError, KeyError, IndexError):
+        return 'pro'
 
 def check_limit(conn, kind):
     """Return True if the current business is allowed to add more rows of `kind`."""
-    limits = PLAN_LIMITS.get(get_effective_plan(), PLAN_LIMITS['free'])
+    limits = PLAN_LIMITS.get(get_effective_plan(), PLAN_LIMITS['trial'])
     cap = limits.get(kind)
     if cap is None:
         return True
@@ -586,7 +621,7 @@ def login():
             return render_template('login.html', slug=slug)
         conn = get_db()
         user = query(conn, '''SELECT u.*, b.name as business_name, b.currency, b.slug, b.logo,
-                                     b.status as biz_status, b.plan as biz_plan, b.paid_until
+                                     b.status as biz_status, b.plan as biz_plan, b.paid_until, b.trial_ends_at
                               FROM users u JOIN businesses b ON u.business_id = b.id
                               WHERE u.username = ? AND b.slug = ?''',
                      (username, slug)).fetchone()
@@ -606,6 +641,7 @@ def login():
             session['biz'] = {'id': user['business_id'], 'name': user['business_name'],
                               'currency': user['currency'], 'slug': user['slug'], 'logo': user['logo'],
                               'plan': user['biz_plan'] or 'free', 'paid_until': user['paid_until'],
+                              'trial_ends_at': user['trial_ends_at'],
                               'status': user['biz_status']}
             session.permanent = True
             app.permanent_session_lifetime = timedelta(hours=12)
@@ -1515,7 +1551,8 @@ def platform():
 def platform_approve(id):
     conn = get_db()
     try:
-        query(conn, "UPDATE businesses SET status = 'active' WHERE id = ?", (id,))
+        query(conn, "UPDATE businesses SET status = 'active', trial_ends_at = COALESCE(trial_ends_at, ?) WHERE id = ?",
+              ((datetime.now() + timedelta(days=TRIAL_DAYS)).isoformat(sep=' ')[:19], id))
         db_commit(conn)
         log_audit(conn, 'approve', 'businesses', id, f'Approved business #{id}')
         flash('Business approved', 'success')
@@ -1585,7 +1622,7 @@ def billing():
         db_close(conn)
         return redirect(url_for('dashboard'))
     plan = get_effective_plan()
-    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS['free'])
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS['trial'])
     usage = {}
     for kind in ('products', 'users', 'customers'):
         usage[kind] = query(conn, f'SELECT COUNT(*) as c FROM {kind} WHERE business_id = ?', (bid,)).fetchone()['c']

@@ -57,10 +57,13 @@
         </div>
     </div>
     <div class="alert alert-light border mt-3 small mb-0">
+        <div class="fw-bold mb-1"><i class="bi bi-clock-history text-primary"></i> Free 7-day trial</div>
+        <div class="mb-2">Try everything free for a week after your business is approved.</div>
+        <hr class="my-2">
         <div class="fw-bold mb-1"><i class="bi bi-phone text-primary"></i> Pro plan — pay by Mobile Money</div>
         {% if PRO_PRICE %}<div class="mb-1">{{ PRO_PRICE }}</div>{% endif %}
         <div class="mb-1">Send to: <span class="fw-bold text-dark">{{ PAYMENT_PHONE }}</span></div>
-        <div class="text-muted">After sending, request an upgrade from your Billing page and we'll activate it.</div>
+        <div class="text-muted">After your trial ends, Pro keeps you going. Send payment, then request an upgrade from your Billing page.</div>
     </div>
     <button type="submit" class="btn btn-brand w-100 py-2 mt-3"><i class="bi bi-rocket-takeoff me-1"></i>Create business</button>
     <p class="text-center text-muted small mt-3 mb-0">
