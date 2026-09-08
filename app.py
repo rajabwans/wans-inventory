@@ -41,6 +41,7 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 ALLOWED_PROOF_EXT = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
 csrf = CSRFProtect()
 csrf.init_app(app)
+app.config['WTF_CSRF_TIME_LIMIT'] = None
 limiter = Limiter(get_remote_address, app=app, default_limits=["500 per day"])
 
 PASSWORD = os.environ.get('APP_PASSWORD', 'wans123')
