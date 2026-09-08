@@ -4,13 +4,13 @@
 {% from "_macros.html" import render_pagination %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold"><i class="bi bi-cart"></i> Sales History <small class="text-muted">({{ total }})</small></h4>
-    <a href="{{ url_for('add_sale') }}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> New Sale</a>
+    <a href="{{ url_for('add_sale') }}" class="btn btn-brand"><i class="bi bi-plus-lg"></i> New Sale</a>
 </div>
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="table-dark">
+                <thead>
                     <tr>
                         <th>#</th>
                         <th>Product</th>

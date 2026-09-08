@@ -11,62 +11,54 @@
 
 <div class="row g-3 mb-4">
     <a href="{{ url_for('products') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <div class="card-body text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="small opacity-75 mb-1">Total Products</p>
-                        <h2 class="fw-bold mb-0">{{ total_products }}</h2>
-                    </div>
-                    <i class="bi bi-box-seam fs-1 opacity-50"></i>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Total Products</span>
+                    <h3 class="stat-value mb-1">{{ total_products }}</h3>
+                    <p class="small text-muted mb-0">{{ "{:,.0f}".format(total_invested) }} {{ CURRENCY }} invested</p>
                 </div>
-                <p class="small opacity-75 mb-0 mt-2">Items in {{ CURRENCY }} {{ "{:,.0f}".format(total_invested) }} invested</p>
+                <span class="stat-icon indigo"><i class="bi bi-box-seam"></i></span>
             </div>
         </div>
     </a>
     <a href="{{ url_for('products') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-            <div class="card-body text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="small opacity-75 mb-1">Stock Units</p>
-                        <h2 class="fw-bold mb-0">{{ total_stock }}</h2>
-                    </div>
-                    <i class="bi bi-archive fs-1 opacity-50"></i>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Stock Units</span>
+                    <h3 class="stat-value mb-1">{{ total_stock }}</h3>
+                    <p class="small text-muted mb-0">Units across all products</p>
                 </div>
-                <p class="small opacity-75 mb-0 mt-2">Units across all products</p>
+                <span class="stat-icon violet"><i class="bi bi-archive"></i></span>
             </div>
         </div>
     </a>
     <a href="{{ url_for('sales') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-            <div class="card-body text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="small opacity-75 mb-1">Total Revenue</p>
-                        <h2 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_sales_amount) }}</h2>
-                    </div>
-                    <i class="bi bi-graph-up-arrow fs-1 opacity-50"></i>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Total Revenue</span>
+                    <h3 class="stat-value mb-1">{{ CURRENCY }} {{ "{:,.0f}".format(total_sales_amount) }}</h3>
+                    <p class="small text-muted mb-0">{{ recent_sales_count or 0 }} transactions</p>
                 </div>
-                <p class="small opacity-75 mb-0 mt-2">From {{ recent_sales_count or 0 }} transactions</p>
+                <span class="stat-icon sky"><i class="bi bi-graph-up-arrow"></i></span>
             </div>
         </div>
     </a>
     <a href="{{ url_for('sales') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-            <div class="card-body text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="small opacity-75 mb-1">Net Profit</p>
-                        <h2 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_profit) }}</h2>
-                    </div>
-                    <i class="bi bi-cash-stack fs-1 opacity-50"></i>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Net Profit</span>
+                    <h3 class="stat-value mb-1">{{ CURRENCY }} {{ "{:,.0f}".format(total_profit) }}</h3>
+                    <p class="small text-muted mb-0">
+                        {% if total_sales_amount > 0 %}
+                        {{ "{:,.1f}".format(total_profit / total_sales_amount * 100) }}% margin
+                        {% else %}No sales yet{% endif %}
+                    </p>
                 </div>
-                <p class="small opacity-75 mb-0 mt-2">
-                    {% if total_sales_amount > 0 %}
-                    Margin: {{ "{:,.1f}".format(total_profit / total_sales_amount * 100) }}%
-                    {% else %}No sales yet{% endif %}
-                </p>
+                <span class="stat-icon emerald"><i class="bi bi-cash-stack"></i></span>
             </div>
         </div>
     </a>
@@ -74,57 +66,67 @@
 
 <div class="row g-3 mb-4">
     <a href="{{ url_for('products') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm bg-dark text-white h-100">
-            <div class="card-body">
-                <p class="small opacity-75 mb-1">Capital Invested</p>
-                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(total_invested) }}</h4>
-                <p class="small opacity-75 mb-0 mt-2">Total buying cost of stock</p>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Capital Invested</span>
+                    <h4 class="stat-value mb-1">{{ CURRENCY }} {{ "{:,.0f}".format(total_invested) }}</h4>
+                    <p class="small text-muted mb-0">Total buying cost of stock</p>
+                </div>
+                <span class="stat-icon slate"><i class="bi bi-bank"></i></span>
             </div>
         </div>
     </a>
     <div class="col-6 col-lg-3">
-        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%);">
-            <div class="card-body text-white">
-                <p class="small opacity-75 mb-1">This Month</p>
-                <h4 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(monthly_profit - monthly_expenses) }}</h4>
-                <p class="small opacity-75 mb-0 mt-2">
-                    Revenue: {{ CURRENCY }} {{ "{:,.0f}".format(monthly_profit) }} |
-                    Expenses: {{ CURRENCY }} {{ "{:,.0f}".format(monthly_expenses) }}
-                </p>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">This Month</span>
+                    <h4 class="stat-value mb-1">{{ CURRENCY }} {{ "{:,.0f}".format(monthly_profit - monthly_expenses) }}</h4>
+                    <p class="small text-muted mb-0">Rev {{ "{:,.0f}".format(monthly_profit) }} · Exp {{ "{:,.0f}".format(monthly_expenses) }}</p>
+                </div>
+                <span class="stat-icon amber"><i class="bi bi-calendar-month"></i></span>
             </div>
         </div>
     </div>
     <a href="{{ url_for('products') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="small text-muted mb-1">Expected Profit</p>
-                <h4 class="fw-bold mb-0 text-success">{{ CURRENCY }} {{ "{:,.0f}".format(total_possible_profit) }}</h4>
-                <p class="small text-muted mb-0 mt-2">If all stock sells at listed price</p>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Expected Profit</span>
+                    <h4 class="stat-value text-success mb-1">{{ CURRENCY }} {{ "{:,.0f}".format(total_possible_profit) }}</h4>
+                    <p class="small text-muted mb-0">If all stock sells at listed price</p>
+                </div>
+                <span class="stat-icon teal"><i class="bi bi-graph-up"></i></span>
             </div>
         </div>
     </a>
     <a href="{{ url_for('sales') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="small text-muted mb-1">Capital Recovery</p>
-                {% if total_invested > 0 %}
-                {% set recovered = (total_sales_amount - total_profit) / total_invested * 100 %}
-                {% else %}{% set recovered = 0 %}{% endif %}
-                <h4 class="fw-bold mb-0">{{ "{:,.1f}".format(recovered) }}%</h4>
-                <div class="progress mt-2" style="height: 6px;">
-                    <div class="progress-bar bg-success" style="width: {% if recovered > 100 %}100{% else %}{{ "{:,.1f}".format(recovered) }}{% endif %}%"></div>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Capital Recovery</span>
+                    {% if total_invested > 0 %}
+                    {% set recovered = (total_sales_amount - total_profit) / total_invested * 100 %}
+                    {% else %}{% set recovered = 0 %}{% endif %}
+                    <h4 class="stat-value mb-1">{{ "{:,.1f}".format(recovered) }}%</h4>
+                    <div class="progress mt-1" style="height: 6px;">
+                        <div class="progress-bar bg-success" style="width: {% if recovered > 100 %}100{% else %}{{ "{:,.1f}".format(recovered) }}{% endif %}%"></div>
+                    </div>
                 </div>
+                <span class="stat-icon rose"><i class="bi bi-arrow-repeat"></i></span>
             </div>
         </div>
     </a>
     <a href="{{ url_for('products') }}" class="col-6 col-lg-3 text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="small text-muted mb-1">Low Stock Items</p>
-                <h4 class="fw-bold mb-0 {% if low_stock|length > 0 %}text-danger{% else %}text-success{% endif %}">
-                    {{ low_stock|length }}
-                </h4>
-                <p class="small text-muted mb-0 mt-2">Items with 5 or fewer units</p>
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <span class="stat-label">Low Stock Items</span>
+                    <h4 class="stat-value {% if low_stock|length > 0 %}text-danger{% else %}text-success{% endif %} mb-1">{{ low_stock|length }}</h4>
+                    <p class="small text-muted mb-0">Items with 5 or fewer units</p>
+                </div>
+                <span class="stat-icon {% if low_stock|length > 0 %}red{% else %}emerald{% endif %}"><i class="bi bi-exclamation-triangle"></i></span>
             </div>
         </div>
     </a>

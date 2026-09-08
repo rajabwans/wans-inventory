@@ -4,7 +4,7 @@
 {% from "_macros.html" import render_pagination %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold"><i class="bi bi-receipt"></i> Expenses <small class="text-muted">({{ total_count }})</small></h4>
-    <a href="{{ url_for('add_expense') }}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> Add Expense</a>
+    <a href="{{ url_for('add_expense') }}" class="btn btn-brand"><i class="bi bi-plus-lg"></i> Add Expense</a>
 </div>
 <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -20,7 +20,7 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="table-dark">
+                <thead>
                     <tr>
                         <th>#</th>
                         <th>Description</th>

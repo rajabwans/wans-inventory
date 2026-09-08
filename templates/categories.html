@@ -20,7 +20,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="kind" value="product"/>
                     <input type="text" name="name" class="form-control" placeholder="e.g. Shoes, Electronics, Stationery..." required>
-                    <button type="submit" class="btn btn-dark text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
+                    <button type="submit" class="btn btn-brand text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
                 </form>
                 {% if product_cats %}
                 <ul class="list-group">
@@ -52,7 +52,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="kind" value="expense"/>
                     <input type="text" name="name" class="form-control" placeholder="e.g. Rent, Transport, Salaries..." required>
-                    <button type="submit" class="btn btn-dark text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
+                    <button type="submit" class="btn btn-brand text-nowrap"><i class="bi bi-plus-lg"></i> Add</button>
                 </form>
                 {% if expense_cats %}
                 <ul class="list-group">

@@ -37,7 +37,7 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.02em; }
     top: 0; left: 0; right: 0;
     z-index: 1040;
     height: 68px;
-    background: rgba(15,23,42,.92);
+    background: linear-gradient(135deg, rgba(23,21,59,.96), rgba(30,27,75,.93));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     box-shadow: 0 1px 0 rgba(255,255,255,.06);
@@ -111,7 +111,27 @@ a.card:hover { transform: translateY(-2px); }
     align-items: center;
     justify-content: center;
     font-size: 1.25rem;
+    color: #fff;
+    flex-shrink: 0;
+    box-shadow: 0 6px 14px rgba(15,23,42,.12);
 }
+.stat-card .stat-icon.indigo { background: linear-gradient(135deg,#4f46e5,#6366f1); }
+.stat-card .stat-icon.violet { background: linear-gradient(135deg,#7c3aed,#a855f7); }
+.stat-card .stat-icon.sky    { background: linear-gradient(135deg,#0284c7,#38bdf8); }
+.stat-card .stat-icon.emerald{ background: linear-gradient(135deg,#059669,#34d399); }
+.stat-card .stat-icon.amber  { background: linear-gradient(135deg,#d97706,#fbbf24); }
+.stat-card .stat-icon.teal   { background: linear-gradient(135deg,#0d9488,#2dd4bf); }
+.stat-card .stat-icon.rose   { background: linear-gradient(135deg,#e11d48,#fb7185); }
+.stat-card .stat-icon.slate  { background: linear-gradient(135deg,#334155,#64748b); }
+.stat-card .stat-icon.red    { background: linear-gradient(135deg,#dc2626,#f87171); }
+.stat-card .stat-label {
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+}
+.stat-card .stat-value { font-weight: 800; letter-spacing: -0.03em; }
 
 /* ---------- Forms ---------- */
 .form-label { font-weight: 600; font-size: .8rem; letter-spacing: .01em; }
