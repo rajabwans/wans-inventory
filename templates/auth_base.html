@@ -14,10 +14,13 @@
 <body>
     <div class="auth-shell">
         <aside class="auth-aside">
-            <div class="auth-brand text-white mb-5">
-                <span class="auth-logo"><i class="bi bi-box2-fill"></i></span>
-                <span class="lh-sm"><span class="d-block fw-bold">{{ PRODUCT_NAME }}</span><span class="d-block" style="font-size:.8rem;opacity:.7;letter-spacing:.05em;text-transform:uppercase;">wanland planner</span></span>
-            </div>
+            <a class="auth-brand text-white mb-5 text-decoration-none" href="{{ url_for('landing') }}">
+                <span class="auth-logo" style="width:56px;height:56px;font-size:1.6rem;border-radius:16px;"><i class="bi bi-box2-fill"></i></span>
+                <span class="lh-sm">
+                    <span class="d-block fw-bolder" style="font-size:1.75rem;letter-spacing:-.03em;">{{ PRODUCT_NAME }}</span>
+                    <span class="d-block" style="font-size:.78rem;opacity:.7;letter-spacing:.12em;text-transform:uppercase;">wanland planner</span>
+                </span>
+            </a>
             <div class="mb-4">
                 <h2 class="fw-bold text-white mb-3">Inventory done right.</h2>
                 <p class="opacity-75 mb-4">Manage products, sales, customers, expenses and profits — all in one clean workspace.</p>

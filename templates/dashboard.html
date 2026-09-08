@@ -109,8 +109,11 @@
                     {% set total_cogs = total_sales_amount - total_profit %}
                     {% set capital_deployed = total_cogs + total_invested %}
                     {% if capital_deployed > 0 %}
-                        {% set recovered = total_cogs / capital_deployed * 100 %}
-                    {% else %}{% set recovered = 0 %}{% endif %}
+                        {% set recovered_raw = total_cogs / capital_deployed * 100 %}
+                    {% else %}{% set recovered_raw = 0 %}{% endif %}
+                    {% if recovered_raw > 100 %}{% set recovered_raw = 100 %}{% endif %}
+                    {% if recovered_raw < 0 %}{% set recovered_raw = 0 %}{% endif %}
+                    {% set recovered = recovered_raw %}
                     <h4 class="stat-value mb-1">{{ "{:,.1f}".format(recovered) }}%</h4>
                     <div class="progress mt-1" style="height: 6px;">
                         <div class="progress-bar bg-success" style="width: {{ "{:,.1f}".format(recovered) }}%"></div>
