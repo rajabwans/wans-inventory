@@ -6,7 +6,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-{{ 'pencil' if customer else 'plus-circle' }}"></i> {{ 'Edit' if customer else 'Add' }} Customer</h5></div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" {% if not customer %}data-offline-op="customer" data-offline-return="/wans/customers"{% endif %}>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="row g-3">
                         <div class="col-12">

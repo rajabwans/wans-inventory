@@ -6,7 +6,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-plus-circle"></i> Add Expense</h5></div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" data-offline-op="expense" data-offline-return="/wans/expenses">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="row g-3">
                         <div class="col-12">

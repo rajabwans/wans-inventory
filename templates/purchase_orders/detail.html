@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Purchase Order #{{ po.id }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-cart-check"></i> Purchase Order #{{ po.id }}</h4>
+    <div>
+        {% if po.status != 'received' and po.status != 'cancelled' %}
+        <a href="{{ url_for('receive_purchase_order', id=po.id) }}" class="btn btn-success"><i class="bi bi-box-arrow-in-down"></i> Receive Items</a>
+        {% endif %}
+        <a href="{{ url_for('purchase_orders') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+</div>
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light"><tr><th>Product</th><th>Ordered</th><th>Received</th><th>Unit Cost</th><th>Subtotal</th></tr></thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td><strong>{{ item.product_title or ('Product #' + item.product_id|string) }}</strong></td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.received_qty }}</td>
+                            <td>{{ CURRENCY }} {{ "{:,.0f}".format(item.unit_cost) }}</td>
+                            <td>{{ CURRENCY }} {{ "{:,.0f}".format(item.quantity * item.unit_cost) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot><tr class="table-secondary"><td colspan="4" class="text-end fw-bold">Total</td><td class="fw-bold">{{ CURRENCY }} {{ "{:,.0f}".format(po.total) }}</td></tr></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <p class="small text-muted mb-1">Supplier</p>
+                <p class="fw-bold">{{ po.supplier_name or '—' }}</p>
+                <p class="small text-muted mb-1">Status</p>
+                <p><span class="badge {% if po.status == 'received' %}bg-success{% elif po.status == 'partial' %}bg-warning text-dark{% else %}bg-primary{% endif %}">{{ po.status|capitalize }}</span></p>
+                <p class="small text-muted mb-1">Expected</p>
+                <p class="fw-bold">{{ po.expected_date or '—' }}</p>
+                <p class="small text-muted mb-1">Created</p>
+                <p class="fw-bold">{{ po.created_at[:10] if po.created_at is string else po.created_at.strftime('%Y-%m-%d') }}</p>
+                {% if po.notes %}
+                <hr>
+                <p class="small text-muted mb-1">Notes</p>
+                <p>{{ po.notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

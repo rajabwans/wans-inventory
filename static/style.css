@@ -158,7 +158,6 @@ a.card:hover { transform: translateY(-2px); }
 .btn-brand:hover { color: #fff; filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,70,229,.45); }
 .btn-outline-brand { background: #fff; color: var(--brand); border: 1.5px solid var(--brand); }
 .btn-outline-brand:hover { background: var(--brand); color: #fff; }
-.offline-queue { max-height: 18rem; overflow: auto; }
 .btn-dark { background: var(--ink); border: none; }
 .btn-dark:hover { background: #1e293b; transform: translateY(-1px); }
 .btn-outline-secondary { border-color: var(--line); color: var(--ink); }

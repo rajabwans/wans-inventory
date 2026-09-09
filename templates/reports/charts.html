@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Profit Charts{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-graph-up"></i> Profit Charts</h4>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Period</label>
+                <select name="period" class="form-select" id="periodSelect" onchange="toggleCustom()">
+                    <option value="7" {{ 'selected' if period == '7' }}>Last 7 days</option>
+                    <option value="30" {{ 'selected' if period == '30' }}>Last 30 days</option>
+                    <option value="90" {{ 'selected' if period == '90' }}>Last 3 months</option>
+                    <option value="180" {{ 'selected' if period == '180' }}>Last 6 months</option>
+                    <option value="365" {{ 'selected' if period == '365' }}>Last year</option>
+                    <option value="custom" {{ 'selected' if period == 'custom' }}>Custom range</option>
+                </select>
+            </div>
+            <div class="col-md-3 custom-range" style="{{ '' if period == 'custom' else 'display:none' }}">
+                <label class="form-label small fw-bold">From</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="col-md-3 custom-range" style="{{ '' if period == 'custom' else 'display:none' }}">
+                <label class="form-label small fw-bold">To</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3"><button type="submit" class="btn btn-brand"><i class="bi bi-filter"></i> Update</button></div>
+        </form>
+    </div>
+</div>
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-success text-white">
+            <div class="card-body text-center">
+                <p class="small opacity-75 mb-1">Revenue</p>
+                <h3 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.revenue) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-white" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
+            <div class="card-body text-center">
+                <p class="small opacity-75 mb-1">Net Profit</p>
+                <h3 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.net_profit) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-danger text-white">
+            <div class="card-body text-center">
+                <p class="small opacity-75 mb-1">Expenses</p>
+                <h3 class="fw-bold mb-0">{{ CURRENCY }} {{ "{:,.0f}".format(totals.expenses) }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold"><i class="bi bi-graph-up-arrow me-1"></i> Revenue, Profit & Expenses Over Time</div>
+            <div class="card-body" style="height:350px;"><canvas id="profitChart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold"><i class="bi bi-pie-chart me-1"></i> Expense Breakdown</div>
+            <div class="card-body" style="height:350px;"><canvas id="expenseChart"></canvas></div>
+        </div>
+    </div>
+</div>
+<div class="row g-4 mt-0">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold"><i class="bi bi-trophy me-1"></i> Top Products by Revenue</div>
+            <div class="card-body" style="height:300px;"><canvas id="topProductsChart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold"><i class="bi bi-bar-chart me-1"></i> Daily Sales</div>
+            <div class="card-body" style="height:300px;"><canvas id="dailySalesChart"></canvas></div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='charts.js') }}"></script>
+<script>
+function toggleCustom() {
+    var v = document.getElementById('periodSelect').value;
+    document.querySelectorAll('.custom-range').forEach(function(el) { el.style.display = v === 'custom' ? '' : 'none'; });
+}
+var profitData = {{ chart_data.profit|tojson }}; profitData.currency = '{{ CURRENCY }}'; WanChart.profit('profitChart', profitData);
+var expenseData = {{ chart_data.expenses|tojson }}; expenseData.currency = '{{ CURRENCY }}'; WanChart.category('expenseChart', expenseData);
+var topProductsData = {{ chart_data.top_products|tojson }}; topProductsData.currency = '{{ CURRENCY }}'; topProductsData.datasetLabel = 'Revenue'; WanChart.bar('topProductsChart', topProductsData);
+var dailyData = {{ chart_data.daily_sales|tojson }}; dailyData.currency = '{{ CURRENCY }}'; dailyData.datasetLabel = 'Sales'; WanChart.bar('dailySalesChart', dailyData);
+</script>
+{% endblock %}

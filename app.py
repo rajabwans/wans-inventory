@@ -265,7 +265,34 @@ SCHEMA_SQLITE = '''
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(business_id, kind, name)
     );
+
+    CREATE TABLE IF NOT EXISTS locations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL, address TEXT, phone TEXT,
+        is_default INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL, phone TEXT, email TEXT, address TEXT, notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL DEFAULT 1,
+        supplier_id INTEGER,
+        status TEXT DEFAULT 'pending', total REAL DEFAULT 0, notes TEXT, expected_date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_id INTEGER NOT NULL, product_id INTEGER, product_title TEXT,
+        quantity INTEGER NOT NULL DEFAULT 0, received_qty INTEGER DEFAULT 0, unit_cost REAL DEFAULT 0
+    );
 '''
+
 
 SCHEMA_PG = '''
     CREATE TABLE IF NOT EXISTS businesses (
@@ -337,6 +364,10 @@ SCHEMA_PG = '''
 '''
 
 MIGRATION_SQLITE = [
+    "ALTER TABLE products ADD COLUMN barcode TEXT",
+    "ALTER TABLE products ADD COLUMN location_id INTEGER",
+    "ALTER TABLE products ADD COLUMN supplier_id INTEGER",
+    "ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER DEFAULT 5",
     "ALTER TABLE products ADD COLUMN version INTEGER DEFAULT 1",
     "ALTER TABLE sales ADD COLUMN customer_id INTEGER",
     "ALTER TABLE expenses ADD COLUMN user_id INTEGER",
@@ -711,14 +742,6 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
-@app.route('/offline')
-@login_required
-def offline_page():
-    if get_effective_plan() == 'expired':
-        flash('Your free trial has ended. Activate Pro to continue using {}'.format(PRODUCT_NAME), 'warning')
-        return redirect(url_for('billing'))
-    return render_template('offline_page.html')
 
 @app.route('/dashboard')
 @login_required
@@ -2200,6 +2223,15 @@ def delete_user(id):
         flash(f'Error deleting user: {e}', 'danger')
     db_close(conn)
     return redirect(url_for('manage_users'))
+
+
+# ---- WANPLAN feature addon ----
+try:
+    import wanplan_addon
+    wanplan_addon.register(app)
+except Exception as e:
+    import sys
+    print('[ADDON ERROR] %s' % e, file=sys.stderr)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

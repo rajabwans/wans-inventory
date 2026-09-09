@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}New Purchase Order{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0 fw-bold"><i class="bi bi-cart-check"></i> New Purchase Order</h5></div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Supplier</label>
+                            <select name="supplier_id" class="form-select">
+                                <option value="">— Select supplier —</option>
+                                {% for s in suppliers %}
+                                <option value="{{ s.id }}">{{ s.name }}{% if s.phone %} ({{ s.phone }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Expected Date</label>
+                            <input type="date" name="expected_date" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="pending">Pending</option>
+                                <option value="ordered">Ordered</option>
+                            </select>
+                        </div>
+                    </div>
+                    <h6 class="fw-bold mb-3">Order Items</h6>
+                    <div id="itemsContainer"></div>
+                    <button type="button" class="btn btn-outline-brand btn-sm mb-3" onclick="addItem()"><i class="bi bi-plus-lg me-1"></i> Add Item</button>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Order notes..."></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-brand"><i class="bi bi-check-lg"></i> Create Order</button>
+                        <a href="{{ url_for('purchase_orders') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+var itemIndex = 0;
+function addItem() {
+    var html = '<div class="row g-2 mb-2 align-items-end item-row" id="item_' + itemIndex + '">' +
+        '<div class="col-md-4"><label class="form-label small">Product (optional)</label><select name="product_id[]" class="form-select form-select-sm"><option value="">— New product —</option>{% for p in products %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}</select></div>' +
+        '<div class="col-md-3"><label class="form-label small">Product Name</label><input type="text" name="product_title[]" class="form-control form-control-sm" placeholder="Name if new"></div>' +
+        '<div class="col-md-2"><label class="form-label small">Qty</label><input type="number" name="quantity[]" class="form-control form-control-sm" min="1" value="1" required></div>' +
+        '<div class="col-md-2"><label class="form-label small">Unit Cost ({{ CURRENCY }})</label><input type="number" name="unit_cost[]" class="form-control form-control-sm" step="any" min="0" value="0" required></div>' +
+        '<div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItem(\'item_' + itemIndex + '\')"><i class="bi bi-x"></i></button></div></div>';
+    document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', html);
+    itemIndex++;
+}
+function removeItem(id) { document.getElementById(id).remove(); }
+addItem();
+</script>
+{% endblock %}

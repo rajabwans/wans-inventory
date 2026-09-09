@@ -37,6 +37,8 @@
                         <td>
                             <a href="{{ url_for('invoice', sale_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Invoice"><i class="bi bi-file-earmark-text"></i></a>
                             <a href="{{ url_for('receipt', sale_id=s.id) }}" class="btn btn-sm btn-outline-success" title="Receipt"><i class="bi bi-receipt"></i></a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="printReceipt({{ s.id }})" title="Print Receipt"><i class="bi bi-printer"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="whatsappReceipt({{ s.id }})" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>
                             <form method="POST" action="{{ url_for('delete_sale', id=s.id) }}" class="d-inline" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>

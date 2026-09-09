@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Purchase Orders{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-cart-check"></i> Purchase Orders <small class="text-muted">({{ total }})</small></h4>
+    <a href="{{ url_for('add_purchase_order') }}" class="btn btn-brand"><i class="bi bi-plus-lg"></i> New Order</a>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>#</th><th>Supplier</th><th>Status</th><th>Items</th><th>Total</th><th>Expected</th><th>Date</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {% for po in orders %}
+                    <tr>
+                        <td>{{ po.id }}</td>
+                        <td>{{ po.supplier_name or '—' }}</td>
+                        <td><span class="badge {% if po.status == 'received' %}bg-success{% elif po.status == 'partial' %}bg-warning text-dark{% elif po.status == 'cancelled' %}bg-secondary{% else %}bg-primary{% endif %}">{{ po.status|capitalize }}</span></td>
+                        <td>{{ po.item_count or 0 }}</td>
+                        <td>{{ CURRENCY }} {{ "{:,.0f}".format(po.total) }}</td>
+                        <td class="small">{{ po.expected_date or '—' }}</td>
+                        <td class="small">{{ (po.created_at[:10] if po.created_at is string else po.created_at.strftime('%Y-%m-%d')) }}</td>
+                        <td>
+                            <a href="{{ url_for('view_purchase_order', id=po.id) }}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                            {% if po.status != 'received' and po.status != 'cancelled' %}
+                            <a href="{{ url_for('receive_purchase_order', id=po.id) }}" class="btn btn-sm btn-outline-success"><i class="bi bi-box-arrow-in-down"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="text-center text-muted py-4">No purchase orders yet. <a href="{{ url_for('add_purchase_order') }}">Create your first order</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

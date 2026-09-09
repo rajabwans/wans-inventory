@@ -15,7 +15,7 @@
 
     <div class="card">
         <div class="card-body p-4">
-            <form method="POST">
+            <form method="POST" data-offline-op="product" data-offline-return="/wans/products">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="row g-3">
                     <div class="col-12">

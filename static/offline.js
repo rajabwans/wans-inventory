@@ -1,581 +1,352 @@
+/* WANPLAN offline layer — enables recording work offline and auto-syncing.
+   Loaded on every page. Strategy:
+   - Keep a local copy (IndexedDB) of products/customers/categories from /api/offline-snapshot.
+   - Intercept forms marked data-offline-op="..." when offline; queue the op instead of submitting.
+   - When back online, flush the queue to /api/sync oldest-first.
+   - Show a small sync status chip in the top-right corner.
+*/
 (function () {
-  'use strict';
+  if (!('indexedDB' in window)) return;
 
-  var DB_NAME = 'wanplan';
+  var DB_NAME = 'wanplan-offline';
   var DB_VERSION = 1;
   var db = null;
+  var queueOps = [];
+  var syncing = false;
 
-  function idb() {
+  function px(name) {
+    var d = document.createElement('div');
+    d.id = 'wanplan-sync-chip';
+    d.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;display:none;align-items:center;gap:8px;background:#4f46e5;color:#fff;padding:8px 14px;border-radius:999px;font:600 13px/1 Inter,sans-serif;box-shadow:0 4px 14px rgba(15,23,42,.25);';
+    d.textContent = name;
+    document.body.appendChild(d);
+    return d;
+  }
+
+  function openDB() {
     return new Promise(function (resolve, reject) {
       var req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = function (e) {
         var d = e.target.result;
-        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
-        if (!d.objectStoreNames.contains('products')) d.createObjectStore('products', { keyPath: 'pid' });
-        if (!d.objectStoreNames.contains('customers')) d.createObjectStore('customers', { keyPath: 'cid' });
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv', { keyPath: 'key' });
+        if (!d.objectStoreNames.contains('products')) d.createObjectStore('products', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('customers')) d.createObjectStore('customers', { keyPath: 'id' });
         if (!d.objectStoreNames.contains('categories')) d.createObjectStore('categories', { keyPath: 'id' });
-        if (!d.objectStoreNames.contains('queue')) d.createObjectStore('queue', { keyPath: 'client_id' });
+        if (!d.objectStoreNames.contains('queue')) d.createObjectStore('queue', { keyPath: 'client_id', autoIncrement: false });
       };
       req.onsuccess = function () { db = req.result; resolve(db); };
       req.onerror = function () { reject(req.error); };
     });
   }
 
-  function tx(store, mode, fn) {
-    var t = db.transaction(store, mode);
-    var s = t.objectStore(store);
+  function storeInto(store, data) {
     return new Promise(function (resolve, reject) {
-      var out;
-      try { out = fn(s); } catch (err) { reject(err); return; }
-      t.oncomplete = function () { resolve(out); };
-      t.onerror = function () { reject(t.error); };
-      t.onabort = function () { reject(t.error); };
+      var tx = db.transaction(store, 'readwrite');
+      var s = tx.objectStore(store);
+      data.forEach(function (row) { s.put(row); });
+      tx.oncomplete = resolve;
+      tx.onerror = function () { reject(tx.error); };
     });
   }
 
-  function reqToPromise(r) {
+  function clearStore(store) {
     return new Promise(function (resolve, reject) {
-      r.onsuccess = function () { resolve(r.result); };
+      var tx = db.transaction(store, 'readwrite');
+      var r = tx.objectStore(store).clear();
+      r.onsuccess = resolve;
       r.onerror = function () { reject(r.error); };
     });
   }
 
   function getAll(store) {
-    return tx(store, 'readonly', function (s) { return reqToPromise(s.getAll()); });
-  }
-  function put(store, value) {
-    return tx(store, 'readwrite', function (s) { s.put(value); });
-  }
-  function bulkPut(store, values) {
-    return tx(store, 'readwrite', function (s) { values.forEach(function (v) { s.put(v); }); });
-  }
-  function del(store, key) {
-    return tx(store, 'readwrite', function (s) { s.delete(key); });
-  }
-  function clearStore(store) {
-    return tx(store, 'readwrite', function (s) { s.clear(); });
-  }
-  function replaceStore(store, values) {
-    return clearStore(store).then(function () { return bulkPut(store, values); });
-  }
-
-  var state = {
-    meta: null,
-    products: [],
-    customers: [],
-    categories: [],
-    queue: [],
-    cart: [],
-    online: navigator.onLine
-  };
-
-  var els = {};
-
-  function $(id) { return document.getElementById(id); }
-  function fmtNum(n) { return Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
-  function uid(prefix) { return prefix + '_' + Math.random().toString(36).slice(2, 10); }
-
-  function esc(v) {
-    return String(v == null ? '' : v).replace(/[&<>"']/g, function (ch) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    return new Promise(function (resolve, reject) {
+      var tx = db.transaction(store, 'readonly');
+      var r = tx.objectStore(store).getAll();
+      r.onsuccess = function () { resolve(r.result || []); };
+      r.onerror = function () { reject(r.error); };
     });
   }
 
-  function api(url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    options.headers['X-CSRFToken'] = window.WANPLAN && window.WANPLAN.csrf || '';
-    if (options.json !== undefined) {
-      options.method = options.method || 'POST';
-      options.headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify(options.json);
-    }
-    return fetch(url, { credentials: 'same-origin', headers: options.headers, method: options.method || 'GET', body: options.body })
-      .then(function (resp) {
-        var ct = resp.headers.get('content-type') || '';
-        if (ct.indexOf('application/json') !== -1) {
-          return resp.json().then(function (j) { return { status: resp.status, json: j }; });
-        }
-        return { status: resp.status, text: resp.status, html: true, redirect: resp.redirected };
-      });
-  }
-
-  function setBadge(text, cls) {
-    var b = els.statusBadge;
-    if (!b) return;
-    b.textContent = text;
-    b.className = 'badge rounded-pill status-badge ' + (cls || 'bg-secondary');
-  }
-
-  function renderConnBanner() {
-    var banner = els.connBanner;
-    if (!banner) return;
-    if (!state.online) {
-      banner.classList.remove('d-none');
-      banner.textContent = 'Offline — everything you add is saved on this device and syncs when you reconnect.';
-      banner.className = 'alert alert-warning mb-2 d-flex align-items-center';
-    } else {
-      banner.classList.add('d-none');
-    }
-  }
-
-  function updateHeader() {
-    if (state.meta) {
-      var t = els.bizName;
-      if (t) t.textContent = state.meta.name || '';
-      var cur = state.meta.currency || '';
-      if (els.currency) els.currency.textContent = cur;
-      if (els.currency2) els.currency2.textContent = cur;
-      if (els.currency3) els.currency3.textContent = cur;
-    }
-    updateQueueBadge();
-    renderConnBanner();
-    var pill = els.connPill;
-    if (pill) {
-      pill.textContent = state.online ? 'Online' : 'Offline';
-      pill.className = state.online ? 'badge rounded-pill bg-success' : 'badge rounded-pill bg-secondary';
-    }
-    var syncEl = els.lastSync;
-    if (syncEl) {
-      var last = state.lastSyncAt;
-      syncEl.textContent = last ? 'Last sync: ' + new Date(last).toLocaleTimeString() : 'Not synced yet';
-    }
-  }
-
-  function updateQueueBadge() {
-    var count = state.queue.length;
-    var b = els.pendingBadge;
-    if (b) {
-      b.textContent = count + ' pending';
-      b.className = 'badge rounded-pill ' + (count ? 'bg-warning text-dark' : 'bg-success');
-    }
-  }
-
-  function productSummary(p) {
-    var qty = Number(p.quantity || 0);
-    return p.title + ' — ' + fmtNum(qty) + ' left' + (qty > 0 ? ' @ ' + fmtNum(p.selling_price) : '');
-  }
-
-  function fillProductOptions(selectId, inStock) {
-    var sel = $(selectId);
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Select product…</option>';
-    state.products.forEach(function (p) {
-      var qty = Number(p.quantity || 0);
-      if (inStock && qty <= 0) return;
-      var opt = document.createElement('option');
-      opt.value = p.pid;
-      opt.textContent = productSummary(p);
-      sel.appendChild(opt);
+  function getKV(key) {
+    return new Promise(function (resolve) {
+      var tx = db.transaction('kv', 'readonly');
+      var r = tx.objectStore('kv').get(key);
+      r.onsuccess = function () { resolve(r.result ? r.result.value : null); };
+      r.onerror = function () { resolve(null); };
     });
   }
 
-  function fillCustomerOptions(selectId, includeWalkin) {
-    var sel = $(selectId);
-    if (!sel) return;
-    sel.innerHTML = '';
-    if (includeWalkin) {
-      var w = document.createElement('option');
-      w.value = '';
-      w.textContent = 'Walk-in (no customer)';
-      sel.appendChild(w);
-    }
-    state.customers.forEach(function (cu) {
-      var opt = document.createElement('option');
-      opt.value = cu.cid;
-      opt.textContent = cu.name;
-      sel.appendChild(opt);
+  function setKV(key, value) {
+    return new Promise(function (resolve) {
+      var tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put({ key: key, value: value });
+      tx.oncomplete = resolve;
     });
   }
 
-  function fillCategoryDatalist(listId, kind) {
-    var dl = $(listId);
-    if (!dl) return;
-    dl.innerHTML = '';
-    state.categories.forEach(function (cat) {
-      if (cat.kind !== kind) return;
-      var o = document.createElement('option');
-      o.value = cat.name;
-      dl.appendChild(o);
+  function putQueue(op) {
+    return new Promise(function (resolve, reject) {
+      var tx = db.transaction('queue', 'readwrite');
+      tx.objectStore('queue').put(op);
+      tx.oncomplete = resolve;
+      tx.onerror = function () { reject(tx.error); };
     });
   }
 
-  function renderProductTab() { fillProductOptions('sellProduct', true); fillProductOptions('stockProduct', true); }
-  function renderCustomerTab() { fillCustomerOptions('sellCustomer', true); }
-  function renderCategoriesTab() { fillCategoryDatalist('productCategoryList', 'product'); fillCategoryDatalist('expenseCategoryList', 'expense'); }
-
-  function renderCart() {
-    var tbody = els.cartLines;
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    var total = 0;
-    state.cart.forEach(function (line) {
-      var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + esc(line.title) + '</td><td>' + fmtNum(line.price) + '</td><td>' + line.qty +
-        '</td><td>' + fmtNum(line.price * line.qty) + '</td><td><button class="btn btn-sm btn-outline-danger" data-idx="' + state.cart.indexOf(line) + '"><i class="bi bi-x"></i></button></td>';
-      tbody.appendChild(tr);
-      total += line.price * line.qty;
+  function deleteQueue(clientId) {
+    return new Promise(function (resolve) {
+      var tx = db.transaction('queue', 'readwrite');
+      tx.objectStore('queue').delete(clientId);
+      tx.oncomplete = resolve;
     });
-    var t = els.cartTotal;
-    if (t) t.textContent = fmtNum(total);
-    tbody.querySelectorAll('[data-idx]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        state.cart.splice(Number(btn.getAttribute('data-idx')), 1);
-        renderCart();
+  }
+
+  function getQueue() {
+    return new Promise(function (resolve, reject) {
+      var tx = db.transaction('queue', 'readonly');
+      var r = tx.objectStore('queue').getAll();
+      r.onsuccess = function () {
+        var all = r.result || [];
+        all.sort(function (a, b) { return (a.created_at || 0) - (b.created_at || 0); });
+        resolve(all);
+      };
+      r.onerror = function () { reject(r.error); };
+    });
+  }
+
+  function isOnline() { return navigator.onLine !== false; }
+
+  function refresh(job) {
+    clearStore('products').then(function () {
+      return clearStore('customers');
+    }).then(function () {
+      return clearStore('categories');
+    }).then(function () {
+      return Promise.all([
+        storeInto('products', job.products || []),
+        storeInto('customers', job.customers || []),
+        storeInto('categories', job.categories || []),
+        setKV('meta', job.meta || {})
+      ]);
+    });
+  }
+
+  function fetchSnapshot() {
+    if (!isOnline()) return Promise.resolve(false);
+    return fetch('/wans/api/offline-snapshot', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) return false;
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.products) return false;
+        refresh(data);
+        return true;
+      })
+      .catch(function () { return false; });
+  }
+
+  function csrfToken() {
+    if (window.WANPLAN && window.WANPLAN.csrf) return window.WANPLAN.csrf;
+    var el = document.querySelector('input[name="csrf_token"]');
+    return el ? el.value : '';
+  }
+
+  function flushQueue() {
+    if (syncing || !db || !isOnline()) return Promise.resolve({ sent: 0, failed: 0 });
+    return getQueue().then(function (queue) {
+      if (!queue.length) { updateChip(); return { sent: 0, failed: 0 }; }
+      syncing = true;
+      updateChip();
+      return fetch('/wans/api/sync', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken()
+        },
+        body: JSON.stringify({ ops: queue })
+      }).then(function (r) { return r.json(); }).then(function (data) {
+        var results = data.results || [];
+        var byClient = {};
+        results.forEach(function (res) { byClient[res.client_id] = res; });
+        var remove = [], failed = 0;
+        queue.forEach(function (op) {
+          var res = byClient[op.client_id];
+          if (res && res.status === 'ok') {
+            remove.push(op.client_id);
+            rekeyLocal(op, res);
+          } else {
+            failed++;
+          }
+        });
+        return Promise.all(remove.map(deleteQueue)).then(function () {
+          syncing = false;
+          updateChip();
+          return { sent: remove.length, failed: failed };
+        });
+      }).catch(function () {
+        syncing = false;
+        return { sent: 0, failed: queue.length };
       });
     });
   }
 
-  function renderQueueTab() {
-    var list = els.queueList;
-    if (!list) return;
-    list.innerHTML = '';
-    if (!state.queue.length) {
-      list.innerHTML = '<div class="text-muted small p-3 text-center"><i class="bi bi-check2-all"></i> Nothing queued. Add sales, products, customers, expenses or stock while offline and they sync automatically.</div>';
-    }
-    state.queue.slice().reverse().forEach(function (op) {
-      var item = document.createElement('div');
-      item.className = 'list-group-item d-flex justify-content-between align-items-start';
-      var err = op.last_error ? '<div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle"></i> ' + esc(op.last_error) + '</div>' : '';
-      var badge = op.last_error ? '<span class="badge bg-danger">Sync failed</span>' : '<span class="badge bg-secondary">Queued</span>';
-      item.innerHTML = '<div class="me-2">' +
-        '<div class="fw-semibold small">' + esc(opLabel(op)) + '</div>' +
-        '<div class="text-muted" style="font-size:.75rem;">' + esc(opTime(op)) + '</div>' + err + '</div>' + badge;
-      list.appendChild(item);
+  function rekeyLocal(op, res) {
+    if (!res.real_id) return;
+    var isP = op.op === 'product', isC = op.op === 'customer';
+    if (!isP && !isC) return;
+    var store = isP ? 'products' : 'customers';
+    getAll(store).then(function (rows) {
+      var found = rows.filter(function (r) { return String(r.id) === String(op.client_id); });
+      if (!found.length) return;
+      found.forEach(function (r) {
+        r.id = res.real_id;
+        storeInto(store, [r]);
+      });
     });
   }
 
-  function opLabel(op) {
-    var p = op.payload || {};
-    switch (op.op) {
-      case 'product': return 'Add product: ' + p.title;
-      case 'customer': return 'Add customer: ' + p.name;
-      case 'expense': return 'Expense: ' + p.description + ' (' + fmtNum(p.amount) + ')';
-      case 'adjust': return 'Stock ' + p.adjustment_type + ': ' + fmtNum(p.quantity) + ' × ' + (p.product_label || '');
-      case 'sale': return 'Sale (' + p.items.length + ' item' + (p.items.length === 1 ? '' : 's') + ') ' + fmtNum(opTotal(p));
-      default: return op.op;
+  var chip = px('');
+
+  function updateChip() {
+    if (!db || !document.body) return;
+    getQueue().then(function (q) {
+      var n = q.length;
+      if (!n) { chip.style.display = 'none'; return; }
+      chip.style.display = 'flex';
+      var text = syncing ? 'Syncing…' : (n + ' pending — will sync');
+      chip.textContent = syncing
+        ? '⇅ Syncing…'
+        : (n + ' saved offline' + (isOnline() ? ' — waiting for network' : ''));
+    });
+  }
+
+  function enqueue(op) {
+    op.created_at = Date.now();
+    return putQueue(op).then(updateChip);
+  }
+
+  function formValue(form, name) {
+    var el = form.elements.namedItem(name);
+    if (!el) return null;
+    if (el.type === 'checkbox') return el.checked ? 1 : 0;
+    return el.value == null ? '' : '' + el.value;
+  }
+
+  function buildOp(form, kind) {
+    var f = function (n) { return formValue(form, n); };
+    if (kind === 'product') {
+      return {
+        client_id: tempId('p'),
+        op: 'product',
+        title: f('title'),
+        category: f('category') || '',
+        quantity: parseInt(f('quantity')) || 0,
+        buying_price: parseFloat(f('buying_price')) || 0,
+        selling_price: parseFloat(f('selling_price')) || 0
+      };
     }
-  }
-  function opTotal(op) {
-    var t = 0;
-    (op.payload.items || []).forEach(function (i) { t += i.qty * i.price; });
-    return t;
-  }
-  function opTime(op) {
-    var d = new Date(op.created_at);
-    return d.toLocaleString();
-  }
-
-  function persist() {
-    var p = Promise.resolve();
-    if (state.meta) p = p.then(function () { return put('kv', { k: 'meta', v: state.meta }); });
-    if (state.lastSyncAt) p = p.then(function () { return put('kv', { k: 'lastSyncAt', v: state.lastSyncAt }); });
-    return p.then(function () { return bulkPut('products', state.products.filter(function (x) { return x.local; }))
-      .then(function () { return bulkPut('customers', state.customers.filter(function (x) { return x.local; })); }); })
-      .then(function () { return replaceStore('queue', state.queue); });
-  }
-
-  function queueOp(op, payload, client_id) {
-    var record = {
-      client_id: client_id || uid('q'),
-      op: op,
-      payload: payload,
-      created_at: Date.now(),
-      last_error: null
-    };
-    state.queue.push(record);
-    persist().then(renderQueueTab);
-    updateQueueBadge();
-    return record;
-  }
-
-  function localProductLookup(pid) {
-    for (var i = 0; i < state.products.length; i++) if (String(state.products[i].pid) === String(pid)) return state.products[i];
+    if (kind === 'customer') {
+      return {
+        client_id: tempId('c'),
+        op: 'customer',
+        name: f('name'),
+        phone: f('phone') || '',
+        email: f('email') || '',
+        address: f('address') || ''
+      };
+    }
+    if (kind === 'expense') {
+      return {
+        client_id: tempId('e'),
+        op: 'expense',
+        description: f('description'),
+        amount: parseFloat(f('amount')) || 0,
+        category: f('category') || ''
+      };
+    }
+    if (kind === 'sale') {
+      var productRef = f('product_id');
+      var customerRef = f('customer_id');
+      return {
+        client_id: tempId('s'),
+        op: 'sale',
+        items: [{
+          product_ref: productRef ? parseInt(productRef) : null,
+          qty: parseInt(f('quantity')) || 1,
+          unit_price: parseFloat(f('unit_price')) || 0
+        }]
+        .filter(function (i) { return i.product_ref; }),
+        customer_ref: customerRef ? parseInt(customerRef) : null,
+        customer_name: f('customer_name') || ''
+      };
+    }
+    if (kind === 'adjust') {
+      return {
+        client_id: tempId('a'),
+        op: 'adjust',
+        product_ref: form.dataset.productId ? parseInt(form.dataset.productId) : null,
+        adjustment_type: f('adjustment_type'),
+        quantity: Math.abs(parseInt(f('quantity'))) || 0,
+        reason: f('reason') || ''
+      };
+    }
     return null;
   }
 
-  function queueSale() {
-    var sel = els.sellProduct, qtyEl = els.sellQty, priceEl = els.sellPrice;
-    var pid = sel && sel.value;
-    var qty = parseInt(qtyEl && qtyEl.value, 10);
-    var price = parseFloat(priceEl && priceEl.value);
-    var prod = localProductLookup(pid);
-    var lines = state.cart.slice();
-    if (pid) {
-      if (!prod) { flashMsg('Pick a product first.'); return; }
-      if (!(qty > 0)) { flashMsg('Quantity must be greater than zero.'); return; }
-      if (!(price > 0)) { flashMsg('Unit price must be greater than zero.'); return; }
-      if (Number(prod.quantity || 0) < qty) { flashMsg('Only ' + prod.quantity + ' of "' + prod.title + '" available.'); return; }
-      lines.push({ product_ref: prod.pid, qty: qty, price: price, title: prod.title });
-      prod.quantity = Number(prod.quantity) - qty;
-    }
-    if (!lines.length) { flashMsg('Add at least one item to the sale.'); return; }
-    var custSel = els.sellCustomer;
-    var custRef = custSel && custSel.value || null;
-    var custNameEl = els.sellCustomerName;
-    var custName = custNameEl && custNameEl.value.trim() || '';
-    queueOp('sale', { items: lines, customer_ref: custRef, customer_name: custName });
-    state.cart = [];
-    if (qtyEl) qtyEl.value = '';
-    if (custNameEl) custNameEl.value = '';
-    persist().then(render);
-    flashMsg('Sale queued — will sync automatically.');
+  var idCounter = 0;
+  function tempId(prefix) {
+    idCounter++;
+    return prefix + '_' + Date.now() + '_' + idCounter;
   }
 
-  function queueProduct() {
-    var title = (els.pTitle.value || '').trim();
-    if (!title) { flashMsg('Product title is required.'); return; }
-    var qty = parseInt(els.pQty.value, 10) || 0;
-    var buy = parseFloat(els.pBuy.value) || 0;
-    var sell = parseFloat(els.pSell.value) || 0;
-    var pid = uid('p');
-    var payload = { title: title, category: (els.pCategory.value || '').trim(), quantity: Math.max(0, qty), buying_price: Math.max(0, buy), selling_price: Math.max(0, sell), notes: (els.pNotes.value || '').trim() };
-    queueOp('product', payload, pid);
-    state.products.push({ pid: pid, title: title, category: payload.category, quantity: payload.quantity, buying_price: payload.buying_price, selling_price: payload.selling_price, local: true });
-    els.pTitle.value = ''; els.pQty.value = ''; els.pBuy.value = ''; els.pSell.value = ''; els.pNotes.value = '';
-    persist().then(render);
-    flashMsg('Product queued locally.');
-  }
-
-  function queueCustomer() {
-    var name = (els.cName.value || '').trim();
-    if (!name) { flashMsg('Customer name is required.'); return; }
-    var cid = uid('c');
-    var payload = { name: name, phone: (els.cPhone.value || '').trim(), email: (els.cEmail.value || '').trim(), address: (els.cAddress.value || '').trim() };
-    queueOp('customer', payload, cid);
-    state.customers.push({ cid: cid, name: name, phone: payload.phone, email: payload.email, address: payload.address, local: true });
-    els.cName.value = ''; els.cPhone.value = ''; els.cEmail.value = ''; els.cAddress.value = '';
-    persist().then(render);
-    flashMsg('Customer queued locally.');
-  }
-
-  function queueExpense() {
-    var desc = (els.eDesc.value || '').trim();
-    var amount = parseFloat(els.eAmount.value);
-    if (!desc) { flashMsg('Description is required.'); return; }
-    if (!(amount > 0)) { flashMsg('Amount must be positive.'); return; }
-    queueOp('expense', { description: desc, amount: amount, category: (els.eCategory.value || '').trim() });
-    els.eDesc.value = ''; els.eAmount.value = ''; els.eCategory.value = '';
-    persist().then(renderQueueTab);
-    flashMsg(('Expense queued — ' + fmtNum(amount)) + '.');
-  }
-
-  function queueAdjust() {
-    var pid = els.stockProduct.value;
-    var type = els.stockType.value;
-    var qty = parseInt(els.stockQty.value, 10);
-    var prod = localProductLookup(pid);
-    if (!prod) { flashMsg('Pick a product first.'); return; }
-    if (!(qty > 0)) { flashMsg('Quantity must be positive.'); return; }
-    var payload = { product_ref: prod.pid, product_label: prod.title, adjustment_type: type, quantity: qty, reason: (els.stockReason.value || '').trim() };
-    queueOp('adjust', payload);
-    if (type === 'correction') prod.quantity = qty;
-    else if (type === 'damaged' || type === 'stolen') prod.quantity = Math.max(0, Number(prod.quantity) - qty);
-    else prod.quantity = Number(prod.quantity) + qty;
-    els.stockQty.value = ''; els.stockReason.value = '';
-    persist().then(render);
-    flashMsg('Stock adjustment queued.');
-  }
-
-  function flashMsg(text) {
-    var el = els.flash;
-    if (!el) return;
-    el.textContent = text;
-    el.classList.remove('d-none');
-    el.classList.add('show');
-    clearTimeout(el._t);
-    el._t = setTimeout(function () { el.classList.add('d-none'); }, 3500);
-  }
-
-  function loadFromDb() {
-    return Promise.all([getAll('kv'), getAll('products'), getAll('customers'), getAll('categories'), getAll('queue')])
-      .then(function (res) {
-        var kv = res[0];
-        state.meta = null; state.lastSyncAt = null;
-        kv.forEach(function (r) { if (r.k === 'meta') state.meta = r.v; if (r.k === 'lastSyncAt') state.lastSyncAt = r.v; });
-        state.products = res[1] || [];
-        state.customers = res[2] || [];
-        state.categories = res[3] || [];
-        state.queue = res[4] || [];
-      });
-  }
-
-  function refreshFromServer() {
-    if (!state.online) return Promise.resolve();
-    return api('/wans/api/offline-snapshot')
-      .then(function (r) {
-        if (r.status !== 200) return;
-        var j = r.json;
-        state.meta = j.meta;
-        var localProducts = {};
-        state.products.forEach(function (p) { if (p.local) localProducts[p.pid] = p; });
-        var localCustomers = {};
-        state.customers.forEach(function (cu) { if (cu.local) localCustomers[cu.cid] = cu; });
-        state.products = j.products.map(function (p) {
-          return { pid: p.id, title: p.title, category: p.category, quantity: p.quantity, buying_price: p.buying_price, selling_price: p.selling_price, local: false };
-        });
-        Object.keys(localProducts).forEach(function (k) {
-          var keeps = true;
-          state.products.forEach(function (p) { if (String(p.pid) === String(k)) keeps = false; });
-          if (keeps) state.products.push(localProducts[k]);
-        });
-        state.customers = j.customers.map(function (cu) {
-          return { cid: cu.id, name: cu.name, phone: cu.phone, email: cu.email, address: cu.address, local: false };
-        });
-        Object.keys(localCustomers).forEach(function (k) {
-          var keeps = true;
-          state.customers.forEach(function (cu) { if (String(cu.cid) === String(k)) keeps = false; });
-          if (keeps) state.customers.push(localCustomers[k]);
-        });
-        state.categories = j.categories || [];
-        state.lastSyncAt = Date.now();
-        return persist().then(function () {
-          return Promise.all([
-            clearStore('products').then(function () { return bulkPut('products', state.products); }),
-            clearStore('customers').then(function () { return bulkPut('customers', state.customers); }),
-            clearStore('categories').then(function () { return bulkPut('categories', state.categories); })
-          ]);
+  function interceptForms() {
+    document.querySelectorAll('form[data-offline-op]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (isOnline()) return;
+        var kind = form.getAttribute('data-offline-op');
+        var op = buildOp(form, kind);
+        if (!op) return;
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        var orig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-wifi-off"></i> Saved offline'; }
+        enqueue(op).then(function () {
+          setTimeout(function () {
+            var url = form.getAttribute('data-offline-return') || '/wans/';
+            window.location.href = url;
+          }, 900);
         });
       });
+    });
   }
 
-  function syncAll() {
-    if (!state.online) { flashMsg('You are offline. Reconnect to sync.'); return Promise.resolve(); }
-    if (syncing) { flashMsg('Already syncing…'); return Promise.resolve(); }
-    if (!state.queue.length) { flashMsg('Nothing to sync — you are up to date.'); return Promise.resolve(); }
-    syncing = true;
-    renderSyncBtn(true);
-    var ops = state.queue.map(function (op) {
-      return {
-        op: op.op,
-        client_id: op.client_id,
-        items: op.payload.items && op.payload.items.map(function (i) { return { product_ref: i.product_ref, qty: i.qty, unit_price: i.price }; }),
-        product_ref: op.payload.product_ref,
-        adjustment_type: op.payload.adjustment_type,
-        quantity: op.payload.quantity,
-        reason: op.payload.reason,
-        title: op.payload.title,
-        category: op.payload.category,
-        buying_price: op.payload.buying_price,
-        selling_price: op.payload.selling_price,
-        notes: op.payload.notes,
-        name: op.payload.name,
-        phone: op.payload.phone,
-        email: op.payload.email,
-        address: op.payload.address,
-        description: op.payload.description,
-        amount: op.payload.amount,
-        customer_ref: op.payload.customer_ref,
-        customer_name: op.payload.customer_name
+  function boot() {
+    openDB().then(function () {
+      updateChip();
+      interceptForms();
+      fetchSnapshot().then(updateChip);
+      window.addEventListener('online', function () {
+        updateChip();
+        fetchSnapshot().then(function () { return flushQueue(); }).then(updateChip);
+      });
+      window.addEventListener('offline', updateChip);
+      window.WANPLAN = window.WANPLAN || {};
+      window.WANPLAN.offline = {
+        isOnline: isOnline,
+        flush: flushQueue,
+        enqueue: enqueue,
+        pending: getQueue,
+        lastSync: function () { return getKV('meta'); }
       };
-    });
-    return api('/wans/api/sync', { json: { ops: ops } })
-      .then(function (r) {
-        if (r.html) { flashMsg('Session expired — please log in again.'); renderSyncBtn(false); return; }
-        if (r.status === 403 && r.json && r.json.blocked) { flashMsg(r.json.message); renderSyncBtn(false); return; }
-        if (r.status !== 200) { flashMsg('Sync failed (' + r.status + '). Your data stays safely queued.'); renderSyncBtn(false); return; }
-        var results = r.json.results || [];
-        var idMap = {};
-        var okIds = {};
-        results.forEach(function (res) {
-          if (res.status === 'ok') {
-            okIds[res.client_id] = true;
-            if (res.real_id) idMap[res.client_id] = res.real_id;
-          } else {
-            var op = state.queue.filter(function (o) { return o.client_id === res.client_id; })[0];
-            if (op) op.last_error = res.message || 'Sync failed';
-          }
-        });
-        state.queue = state.queue.filter(function (op) { return !okIds[op.client_id]; });
-        state.products = state.products.map(function (p) { if (p.local && idMap[p.pid]) { p.pid = idMap[p.pid]; p.local = false; } return p; });
-        state.customers = state.customers.map(function (cu) { if (cu.local && idMap[cu.cid]) { cu.cid = idMap[cu.cid]; cu.local = false; } return cu; });
-        state.lastSyncAt = Date.now();
-        return Promise.all([persist(), replaceStore('queue', state.queue)]).then(function () {
-          return refreshFromServer();
-        });
-      })
-      .catch(function () { flashMsg('Could not connect. Your data stays safely queued.'); })
-      .then(function () { syncing = false; renderSyncBtn(false); render(); });
+      if (isOnline()) flushQueue().then(updateChip);
+    }).catch(function () {});
   }
 
-  var syncing = false;
-  function renderSyncBtn(active) {
-    var b = els.syncBtn;
-    if (!b) return;
-    b.disabled = active;
-    b.innerHTML = active ? '<span class="spinner-border spinner-border-sm me-1"></span>Syncing…' : '<i class="bi bi-arrow-repeat me-1"></i>Sync now';
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
   }
-
-  function render() {
-    updateHeader();
-    renderProductTab();
-    renderCustomerTab();
-    renderCategoriesTab();
-    renderCart();
-    renderQueueTab();
-  }
-
-  function setup() {
-    els.statusBadge = $('statusBadge');
-    els.connPill = $('connPill');
-    els.pendingBadge = $('pendingBadge');
-    els.connBanner = $('connBanner');
-    els.bizName = $('bizName');
-    els.currency = $('currency');
-    els.currency2 = $('currency2');
-    els.currency3 = $('currency3');
-    els.lastSync = $('lastSync');
-    els.syncBtn = $('syncBtn');
-    els.flash = $('flashMsg');
-    els.cartLines = $('cartLines');
-    els.cartTotal = $('cartTotal');
-    els.queueList = $('queueList');
-    els.sellProduct = $('sellProduct');
-    els.sellQty = $('sellQty');
-    els.sellPrice = $('sellPrice');
-    els.sellCustomer = $('sellCustomer');
-    els.sellCustomerName = $('sellCustomerName');
-    els.addLineBtn = $('addLineBtn');
-    els.pTitle = $('pTitle'); els.pCategory = $('pCategory'); els.pQty = $('pQty'); els.pBuy = $('pBuy'); els.pSell = $('pSell'); els.pNotes = $('pNotes');
-    els.cName = $('cName'); els.cPhone = $('cPhone'); els.cEmail = $('cEmail'); els.cAddress = $('cAddress');
-    els.eDesc = $('eDesc'); els.eAmount = $('eAmount'); els.eCategory = $('eCategory');
-    els.stockProduct = $('stockProduct'); els.stockType = $('stockType'); els.stockQty = $('stockQty'); els.stockReason = $('stockReason');
-
-    els.addLineBtn.addEventListener('click', function () {
-      var pid = els.sellProduct.value, qty = parseInt(els.sellQty.value, 10), price = parseFloat(els.sellPrice.value);
-      var prod = localProductLookup(pid);
-      if (!prod) { flashMsg('Pick a product first.'); return; }
-      if (!(qty > 0)) { flashMsg('Quantity must be greater than zero.'); return; }
-      if (!(price > 0)) { flashMsg('Unit price must be greater than zero.'); return; }
-      if (Number(prod.quantity || 0) < qty) { flashMsg('Only ' + prod.quantity + ' of "' + prod.title + '" available.'); return; }
-      state.cart.push({ product_ref: prod.pid, qty: qty, price: price, title: prod.title });
-      prod.quantity = Number(prod.quantity) - qty;
-      els.sellQty.value = '';
-      renderCart();
-      renderProductTab();
-    });
-    els.sellPrice.addEventListener('input', function () {
-      var prod = localProductLookup(els.sellProduct.value);
-      if (prod && !els.sellPrice.value) els.sellPrice.value = prod.selling_price;
-    });
-    els.sellProduct.addEventListener('change', function () {
-      var prod = localProductLookup(els.sellProduct.value);
-      if (prod) els.sellPrice.value = prod.selling_price;
-    });
-    $('queueSaleBtn').addEventListener('click', queueSale);
-    $('queueProductBtn').addEventListener('click', queueProduct);
-    $('queueCustomerBtn').addEventListener('click', queueCustomer);
-    $('queueExpenseBtn').addEventListener('click', queueExpense);
-    $('queueAdjustBtn').addEventListener('click', queueAdjust);
-    els.syncBtn.addEventListener('click', function () { syncAll(); });
-
-    window.addEventListener('online', function () { state.online = true; render(); syncAll(); });
-    window.addEventListener('offline', function () { state.online = false; render(); });
-  }
-
-  idb()
-    .then(loadFromDb)
-    .then(function () { setup(); render(); updateHeader(); })
-    .then(function () { if (navigator.onLine) { return refreshFromServer().then(render).then(function () { return syncAll(); }); } })
-    .catch(function (e) { console && console.error && console.error('offline init', e); });
 })();

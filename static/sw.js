@@ -1,4 +1,4 @@
-const VERSION = 'wanplan-v6';
+const VERSION = 'wanplan-v7';
 
 const PRECACHE = [
   '/wans/static/style.css',
@@ -8,20 +8,18 @@ const PRECACHE = [
   '/wans/static/icon-512.png',
   '/wans/static/apple-touch-icon.png',
   '/wans/static/icon-maskable-512.png',
-  '/wans/static/offline.html',
-  '/wans/static/offline.js',
   '/wans/static/vendor/bootstrap/bootstrap.min.css',
   '/wans/static/vendor/bootstrap/bootstrap.bundle.min.js',
   '/wans/static/vendor/bootstrap-icons/bootstrap-icons.min.css',
   '/wans/static/vendor/bootstrap-icons/fonts/bootstrap-icons.woff2',
-  '/wans/static/vendor/bootstrap-icons/fonts/bootstrap-icons.woff'
+  '/wans/static/vendor/bootstrap-icons/fonts/bootstrap-icons.woff',
+  '/wans/static/offline.js'
 ];
 
 self.addEventListener('install', (e) => {
+  self.skipWaiting();
   e.waitUntil(
-    caches.open(VERSION)
-      .then((cache) => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+    caches.open(VERSION).then((cache) => cache.addAll(PRECACHE))
   );
 });
 
@@ -42,12 +40,25 @@ function cacheInto(cacheName, request, response) {
 }
 
 function staleWhileRevalidate(request) {
-  return caches.match(request).then((hit) => {
+  return caches.match(request, { ignoreSearch: true }).then((hit) => {
     const network = fetch(request)
       .then((res) => cacheInto(VERSION, request, res))
       .catch(() => hit);
     return hit || network;
   });
+}
+
+function networkFirstForNavigation(request) {
+  return fetch(request)
+    .then((res) => {
+      if (res.ok) cacheInto(VERSION, request, res);
+      return res;
+    })
+    .catch(() =>
+      caches.match(request, { ignoreSearch: true }).then((hit) =>
+        hit || caches.match('/wanplan-shell')
+      )
+    );
 }
 
 self.addEventListener('fetch', (e) => {
@@ -57,20 +68,11 @@ self.addEventListener('fetch', (e) => {
 
   if (url.origin === location.origin) {
     if (req.mode === 'navigate') {
-      e.respondWith(
-        fetch(req)
-          .then((res) => {
-            if (res.ok) cacheInto(VERSION, '/wanplan-shell', res);
-            return res;
-          })
-          .catch(() =>
-            caches.match('/wanplan-shell')
-              .then((hit) => hit || caches.match('/wans/static/offline.html'))
-          )
-      );
+      e.respondWith(networkFirstForNavigation(req));
       return;
     }
-    if (url.pathname.indexOf('/wans/static/') === 0) {
+    if (url.pathname.indexOf('/wans/static/') === 0 ||
+        url.pathname === '/wans/offline.js') {
       e.respondWith(staleWhileRevalidate(req));
       return;
     }

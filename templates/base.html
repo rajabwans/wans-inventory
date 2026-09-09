@@ -36,8 +36,11 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('offline_page') }}"><i class="bi bi-wifi-off"></i>Quick Sell (Offline)</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('products') }}"><i class="bi bi-box-seam"></i>Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('scan_page') }}"><i class="bi bi-upc-scan"></i>Scan</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('suppliers') }}"><i class="bi bi-truck"></i>Suppliers</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('purchase_orders') }}"><i class="bi bi-cart-check"></i>Orders</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('locations') }}"><i class="bi bi-geo-alt"></i>Locations</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('sales') }}"><i class="bi bi-cart"></i>Sales</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('customers') }}"><i class="bi bi-people"></i>Customers</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('expenses') }}"><i class="bi bi-receipt"></i>Expenses</a></li>
@@ -48,7 +51,7 @@
                             <li><a class="dropdown-item" href="{{ url_for('stock_report') }}"><i class="bi bi-box-seam"></i>Stock Valuation</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('sales_report') }}"><i class="bi bi-graph-up"></i>Sales Report</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('pnl_report') }}"><i class="bi bi-cash-stack"></i>Profit & Loss</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('offline_page') }}"><i class="bi bi-wifi-off"></i>Quick Sell (Offline)</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('charts_report') }}"><i class="bi bi-graph-up"></i>Profit Charts</a></li>
                         </ul>
                     </li>
                     {% if session.role in ('admin', 'superadmin') %}
@@ -96,6 +99,9 @@
 
     <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
     <script>window.WANPLAN = window.WANPLAN || {}; window.WANPLAN.csrf = '{{ csrf_token() }}';</script>
+    {% if session.user_id %}
+    <script src="{{ url_for('static', filename='offline.js') }}"></script>
+    {% endif %}
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
