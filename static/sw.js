@@ -1,6 +1,7 @@
-const VERSION = 'wanplan-v7';
+const VERSION = 'wanplan-v8';
 
 const PRECACHE = [
+  '/wans/static/fonts.css',
   '/wans/static/style.css',
   '/wans/static/logo.svg',
   '/wans/static/manifest.webmanifest',
@@ -80,9 +81,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  if (url.hostname.indexOf('jsdelivr') !== -1 ||
-      url.hostname.indexOf('fonts.googleapis') !== -1 ||
-      url.hostname.indexOf('fonts.gstatic') !== -1) {
+  if (url.hostname.indexOf('jsdelivr') !== -1) {
     e.respondWith(staleWhileRevalidate(req));
   }
 });
