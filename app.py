@@ -361,6 +361,28 @@ SCHEMA_PG = '''
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(business_id, kind, name)
     );
+    CREATE TABLE IF NOT EXISTS locations (
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL, address TEXT, phone TEXT,
+        is_default INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS suppliers (
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        name TEXT NOT NULL, phone TEXT, email TEXT, address TEXT, notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY, business_id INTEGER NOT NULL DEFAULT 1,
+        supplier_id INTEGER,
+        status TEXT DEFAULT 'pending', total REAL DEFAULT 0, notes TEXT, expected_date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id SERIAL PRIMARY KEY,
+        po_id INTEGER NOT NULL, product_id INTEGER, product_title TEXT,
+        quantity INTEGER NOT NULL DEFAULT 0, received_qty INTEGER DEFAULT 0, unit_cost REAL DEFAULT 0
+    );
 '''
 
 MIGRATION_SQLITE = [
@@ -388,6 +410,10 @@ MIGRATION_SQLITE = [
 ]
 
 MIGRATION_PG = [
+    "ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode TEXT",
+    "ALTER TABLE products ADD COLUMN IF NOT EXISTS location_id INTEGER",
+    "ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INTEGER",
+    "ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 5",
     "ALTER TABLE products ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1",
     "ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_id INTEGER",
     "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER",
