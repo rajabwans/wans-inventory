@@ -5,3 +5,5 @@ inventory.db
 venv/
 *.bak
 uploads/
+*.bak
+*.bak2
