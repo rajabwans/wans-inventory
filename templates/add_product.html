@@ -58,6 +58,20 @@
                             <input type="number" step="1" name="selling_price" id="sellingPrice" class="form-control" value="0" min="0" required>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <label class="field-label"><i class="bi bi-upc-scan me-1"></i>Barcode (optional)</label>
+                        <div class="input-icon-wrap">
+                            <i class="bi bi-qr-code"></i>
+                            <input type="text" name="barcode" class="form-control" placeholder="Scan or type barcode">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="field-label"><i class="bi bi-exclamation-triangle me-1"></i>Low stock alert at</label>
+                        <div class="input-icon-wrap">
+                            <i class="bi bi-bell"></i>
+                            <input type="number" name="low_stock_threshold" class="form-control" value="5" min="0">
+                        </div>
+                    </div>
 
                     <div class="col-12 mt-4">
                         <div class="margin-banner" id="marginBanner">

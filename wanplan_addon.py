@@ -297,7 +297,7 @@ def register(app):
         sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (sale_id, bid)).fetchone()
         if not sale:
             db_close(conn); return jsonify({'error': 'sale not found'}), 404
-        product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+        product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (sale['product_id'], bid)).fetchone()
         cust = None
         if sale['customer_id']:
             cust = query(conn, 'SELECT * FROM customers WHERE id = ? AND business_id = ?', (sale['customer_id'], bid)).fetchone()
@@ -320,7 +320,7 @@ def register(app):
         sale = query(conn, 'SELECT * FROM sales WHERE id = ? AND business_id = ?', (sale_id, bid)).fetchone()
         if not sale:
             db_close(conn); return jsonify({'error': 'sale not found'}), 404
-        product = query(conn, 'SELECT * FROM products WHERE id = ?', (sale['product_id'],)).fetchone()
+        product = query(conn, 'SELECT * FROM products WHERE id = ? AND business_id = ?', (sale['product_id'], bid)).fetchone()
         cust = None; phone = ''
         if sale['customer_id']:
             cust = query(conn, 'SELECT * FROM customers WHERE id = ? AND business_id = ?', (sale['customer_id'], bid)).fetchone()

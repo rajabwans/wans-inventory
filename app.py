@@ -1,4 +1,4 @@
-import os, sys, csv, io, re, secrets, smtplib
+import os, sys, csv, io, re, secrets, smtplib, time
 import sqlite3
 from functools import wraps
 from datetime import date, datetime, timedelta
@@ -35,6 +35,17 @@ if URL_PREFIX and URL_PREFIX != '/':
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+@app.after_request
+def set_static_cache(resp):
+    path = request.path
+    if path.startswith('/static/fonts'):
+        resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif path.startswith('/static/sw.js'):
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    elif path.startswith('/static/'):
+        resp.headers['Cache-Control'] = 'public, max-age=86400, stale-while-revalidate=86400'
+    return resp
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'uploads'))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
@@ -291,6 +302,14 @@ SCHEMA_SQLITE = '''
         po_id INTEGER NOT NULL, product_id INTEGER, product_title TEXT,
         quantity INTEGER NOT NULL DEFAULT 0, received_qty INTEGER DEFAULT 0, unit_cost REAL DEFAULT 0
     );
+
+    CREATE INDEX IF NOT EXISTS idx_products_business ON products(business_id);
+    CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+    CREATE INDEX IF NOT EXISTS idx_sales_business ON sales(business_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
+    CREATE INDEX IF NOT EXISTS idx_expenses_business ON expenses(business_id);
+    CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
 '''
 
 
@@ -383,6 +402,13 @@ SCHEMA_PG = '''
         po_id INTEGER NOT NULL, product_id INTEGER, product_title TEXT,
         quantity INTEGER NOT NULL DEFAULT 0, received_qty INTEGER DEFAULT 0, unit_cost REAL DEFAULT 0
     );
+    CREATE INDEX IF NOT EXISTS idx_products_business ON products(business_id);
+    CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+    CREATE INDEX IF NOT EXISTS idx_sales_business ON sales(business_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
+    CREATE INDEX IF NOT EXISTS idx_expenses_business ON expenses(business_id);
+    CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
 '''
 
 MIGRATION_SQLITE = [
@@ -513,10 +539,29 @@ def seed_default_categories():
         print(f'[CATEGORY INIT ERROR] {e}', file=sys.stderr)
     db_close(conn)
 
+_SEED_STAMP = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.seed.stamp')
+
+def _needs_seed():
+    if not os.path.exists(_SEED_STAMP):
+        return True
+    try:
+        return (time.time() - os.path.getmtime(_SEED_STAMP)) > 86400
+    except Exception:
+        return True
+
+def _mark_seeded():
+    try:
+        with open(_SEED_STAMP, 'w'):
+            pass
+    except Exception:
+        pass
+
 init_db()
-create_default_business()
-create_default_admin()
-seed_default_categories()
+if _needs_seed():
+    create_default_business()
+    create_default_admin()
+    seed_default_categories()
+    _mark_seeded()
 
 def login_required(f):
     @wraps(f)
@@ -787,7 +832,7 @@ def dashboard():
                            (first.isoformat(), next_month.isoformat(), bid)).fetchone()['t']
     monthly_expenses = query(conn, 'SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date >= ? AND expense_date < ? AND business_id = ?',
                               (first.isoformat(), next_month.isoformat(), bid)).fetchone()['t']
-    low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= 5 AND business_id = ? ORDER BY quantity LIMIT 10', (bid,)).fetchall()
+    low_stock = query(conn, 'SELECT * FROM products WHERE quantity <= COALESCE(low_stock_threshold, 5) AND business_id = ? ORDER BY quantity LIMIT 10', (bid,)).fetchall()
     recent_sales = query(conn, '''
         SELECT s.*, p.title, COALESCE(c.name, s.customer_name, 'Walk-in') as customer_display
         FROM sales s JOIN products p ON s.product_id = p.id
@@ -898,6 +943,11 @@ def add_product():
             flash('Invalid number values', 'danger')
             return redirect(url_for('add_product'))
         notes = sanitize_input(request.form.get('notes', ''))
+        barcode = sanitize_input(request.form.get('barcode', ''))
+        try:
+            low_stock_threshold = max(0, int(request.form.get('low_stock_threshold', 5) or 5))
+        except (ValueError, TypeError):
+            low_stock_threshold = 5
         conn = get_db()
         bid = get_business_id()
         try:
@@ -905,8 +955,8 @@ def add_product():
                 flash(f'Product limit reached on your {get_effective_plan().capitalize()} plan. Please upgrade.', 'warning')
                 db_close(conn)
                 return redirect(url_for('products'))
-            query(conn, 'INSERT INTO products (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                  (bid, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes))
+            query(conn, 'INSERT INTO products (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, barcode, low_stock_threshold) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                  (bid, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, barcode or None, low_stock_threshold))
             db_commit(conn)
             log_audit(conn, 'create', 'products', None, f'Added: {title}')
             flash('Product added successfully', 'success')
@@ -949,13 +999,18 @@ def edit_product(id):
             db_close(conn)
             return redirect(url_for('edit_product', id=id))
         notes = sanitize_input(request.form.get('notes', ''))
+        barcode = sanitize_input(request.form.get('barcode', ''))
+        try:
+            low_stock_threshold = max(0, int(request.form.get('low_stock_threshold', 5) or 5))
+        except (ValueError, TypeError):
+            low_stock_threshold = 5
         old_version = product['version'] if 'version' in product.keys() else 1
         try:
             result = query(conn, '''UPDATE products SET title=?, author=?, isbn=?, publisher=?, category=?,
-                            quantity=?, buying_price=?, selling_price=?, notes=?,
+                            quantity=?, buying_price=?, selling_price=?, notes=?, barcode=?, low_stock_threshold=?,
                             version=version+1, updated_at=CURRENT_TIMESTAMP
                             WHERE id=? AND version=? AND business_id=?''',
-                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, id, old_version, bid))
+                  (title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, barcode or None, low_stock_threshold, id, old_version, bid))
             db_commit(conn)
             if IS_PG:
                 if result.rowcount == 0:
@@ -2033,10 +2088,14 @@ def _apply_sync_op(conn, bid, op, resolved):
         if not check_limit(conn, 'products'):
             raise ValueError('Product limit reached on your {} plan'.format(get_effective_plan().capitalize()))
         cid = op.get('client_id')
+        try:
+            low_stock_threshold = max(0, int(op.get('low_stock_threshold', 5) or 5))
+        except (ValueError, TypeError):
+            low_stock_threshold = 5
         pid = insert_row(conn, '''INSERT INTO products
-                (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes)
-                VALUES (?,?,?,?,?,?,?,?,?,?)''',
-            (bid, title, '', '', '', sanitize_input(op.get('category')), quantity, buying_price, selling_price, sanitize_input(op.get('notes'))))
+                (business_id, title, author, isbn, publisher, category, quantity, buying_price, selling_price, notes, barcode, low_stock_threshold)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (bid, title, '', '', '', sanitize_input(op.get('category')), quantity, buying_price, selling_price, sanitize_input(op.get('notes')), sanitize_input(op.get('barcode')) or None, low_stock_threshold))
         resolved[cid] = pid
         log_audit(conn, 'create', 'products', pid, 'Added (offline sync): {}'.format(title))
         return {'status': 'ok', 'real_id': pid}
